@@ -8,8 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-      TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORG }}
+      TF_VAR_snowflake_account: ${{ secrets.snowflake_account }}
+      TF_VAR_snowflake_organization: ${{ secrets.snowflake_organization }}
       TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
       TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
       TF_VAR_snowflake_role: ${{ secrets.SNOWFLAKE_ROLE }}
