@@ -470,18 +470,54 @@ resource "snowflake_table" "fact_invoice_header" {
   schema   = snowflake_schema.schema.name
   name     = "RAW_FACT_INVOICE_HEADER"
 
-  column { name = "INVOICE_KEY" type = "NUMBER" }
-  column { name = "INVOICE_ID" type = "STRING" }
-  column { name = "CUSTOMER_KEY" type = "NUMBER" }
-  column { name = "STORE_KEY" type = "NUMBER" }
-  column { name = "INVOICE_DATE" type = "STRING" }
-  column { name = "TOTAL_AMOUNT" type = "FLOAT" }
-  column { name = "TOTAL_TAX" type = "FLOAT" }
-  column { name = "DISCOUNT_AMOUNT" type = "FLOAT" }
-  column { name = "NET_AMOUNT" type = "FLOAT" }
-  column { name = "PAYMENT_STATUS" type = "STRING" }
-  column { name = "CREATED_BY" type = "STRING" }
-  column { name = "CREATED_DATE" type = "STRING" }
+  column { 
+    name = "INVOICE_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "INVOICE_ID" 
+    type = "STRING" 
+  }
+  column { 
+    name = "CUSTOMER_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "STORE_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "INVOICE_DATE" 
+    type = "STRING" 
+  }
+  column { 
+    name = "TOTAL_AMOUNT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "TOTAL_TAX" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "DISCOUNT_AMOUNT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "NET_AMOUNT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "PAYMENT_STATUS" 
+    type = "STRING" 
+  }
+  column { 
+    name = "CREATED_BY" 
+    type = "STRING" 
+  }
+  column { 
+    name = "CREATED_DATE" 
+    type = "STRING" 
+  }
 }
 
 resource "snowflake_table" "fact_invoice_line_item" {
@@ -489,14 +525,38 @@ resource "snowflake_table" "fact_invoice_line_item" {
   schema   = snowflake_schema.schema.name
   name     = "RAW_FACT_INVOICE_LINE_ITEM"
 
-  column { name = "LINE_ITEM_KEY" type = "NUMBER" }
-  column { name = "INVOICE_KEY" type = "NUMBER" }
-  column { name = "PRODUCT_KEY" type = "NUMBER" }
-  column { name = "QUANTITY" type = "NUMBER" }
-  column { name = "UNIT_PRICE" type = "FLOAT" }
-  column { name = "DISCOUNT_PERCENT" type = "FLOAT" }
-  column { name = "TAX_PERCENT" type = "FLOAT" }
-  column { name = "LINE_TOTAL" type = "FLOAT" }
+  column { 
+    name = "LINE_ITEM_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "INVOICE_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "PRODUCT_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "QUANTITY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "UNIT_PRICE" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "DISCOUNT_PERCENT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "TAX_PERCENT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "LINE_TOTAL" 
+    type = "FLOAT" 
+  }
 }
 
 resource "snowflake_table" "fact_payment_b2b_b2d" {
@@ -504,14 +564,38 @@ resource "snowflake_table" "fact_payment_b2b_b2d" {
   schema   = snowflake_schema.schema.name
   name     = "RAW_FACT_PAYMENT_B2B_B2D"
 
-  column { name = "PAYMENT_KEY" type = "NUMBER" }
-  column { name = "INVOICE_KEY" type = "NUMBER" }
-  column { name = "CUSTOMER_KEY" type = "NUMBER" }
-  column { name = "PAYMENT_DATE" type = "STRING" }
-  column { name = "PAYMENT_MODE" type = "STRING" }
-  column { name = "PAID_AMOUNT" type = "FLOAT" }
-  column { name = "REFERENCE_NUMBER" type = "STRING" }
-  column { name = "STATUS" type = "STRING" }
+  column { 
+    name = "PAYMENT_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "INVOICE_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "CUSTOMER_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "PAYMENT_DATE" 
+    type = "STRING" 
+  }
+  column { 
+    name = "PAYMENT_MODE" 
+    type = "STRING" 
+  }
+  column { 
+    name = "PAID_AMOUNT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "REFERENCE_NUMBER" 
+    type = "STRING" 
+  }
+  column { 
+    name = "STATUS" 
+    type = "STRING" 
+  }
 }
 
 resource "snowflake_table" "fact_payment_b2c" {
@@ -519,13 +603,34 @@ resource "snowflake_table" "fact_payment_b2c" {
   schema   = snowflake_schema.schema.name
   name     = "RAW_FACT_PAYMENT_B2C"
 
-  column { name = "PAYMENT_KEY" type = "NUMBER" }
-  column { name = "STORE_KEY" type = "NUMBER" }
-  column { name = "PAYMENT_DATE" type = "STRING" }
-  column { name = "PAYMENT_MODE" type = "STRING" }
-  column { name = "TOTAL_AMOUNT" type = "FLOAT" }
-  column { name = "REFERENCE_NUMBER" type = "STRING" }
-  column { name = "STATUS" type = "STRING" }
+  column { 
+    name = "PAYMENT_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "STORE_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "PAYMENT_DATE" 
+    type = "STRING" 
+  }
+  column { 
+    name = "PAYMENT_MODE" 
+    type = "STRING" 
+  }
+  column { 
+    name = "TOTAL_AMOUNT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "REFERENCE_NUMBER" 
+    type = "STRING" 
+  }
+  column { 
+    name = "STATUS" 
+    type = "STRING" 
+  }
 }
 
 resource "snowflake_table" "fact_returns" {
@@ -533,11 +638,32 @@ resource "snowflake_table" "fact_returns" {
   schema   = snowflake_schema.schema.name
   name     = "RAW_FACT_RETURNS"
 
-  column { name = "RETURN_KEY" type = "NUMBER" }
-  column { name = "INVOICE_KEY" type = "NUMBER" }
-  column { name = "PRODUCT_KEY" type = "NUMBER" }
-  column { name = "RETURN_DATE" type = "STRING" }
-  column { name = "QUANTITY_RETURNED" type = "NUMBER" }
-  column { name = "RETURN_AMOUNT" type = "FLOAT" }
-  column { name = "REASON" type = "STRING" }
+  column { 
+    name = "RETURN_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "INVOICE_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "PRODUCT_KEY" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "RETURN_DATE" 
+    type = "STRING" 
+  }
+  column { 
+    name = "QUANTITY_RETURNED" 
+    type = "NUMBER" 
+  }
+  column { 
+    name = "RETURN_AMOUNT" 
+    type = "FLOAT" 
+  }
+  column { 
+    name = "REASON" 
+    type = "STRING" 
+  }
 }
