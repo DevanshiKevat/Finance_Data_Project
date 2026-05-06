@@ -20,7 +20,7 @@ resource "snowflake_table" "dim_customers" {
   }
   column {
     name = "CUSTOMER_ID"
-    type = "STRING"
+    type = "NUMBER"
   }
   column {
     name = "CUSTOMER_NAME"
