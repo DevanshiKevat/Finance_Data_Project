@@ -16,19 +16,19 @@ resource "snowflake_table" "dim_customers" {
 
   column {
     name = "CUSTOMER_KEY"
-    type = "VARCHAR(300)"
+    type = "STRING"
   }
   column {
     name = "CUSTOMER_ID"
-    type = "NUMBER(20,0)"
+    type = "STRING"
   }
   column {
     name = "CUSTOMER_NAME"
-    type = "NUMBER(10,10)"
+    type = "STRING"
   }
   column {
     name = "CUSTOMER_TYPE"
-    type = "TIMESTAMP_NTZ(9)"
+    type = "STRING"
   }
   column {
     name = "REGION_KEY"
