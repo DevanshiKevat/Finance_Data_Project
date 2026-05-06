@@ -16,15 +16,15 @@ resource "snowflake_table" "dim_customers" {
 
   column {
     name = "CUSTOMER_KEY"
-    type = "VARCHAR(200)"
+    type = "VARCHAR(300)"
   }
   column {
     name = "CUSTOMER_ID"
-    type = "NUMBER(10,0)"
+    type = "NUMBER(20,0)"
   }
   column {
     name = "CUSTOMER_NAME"
-    type = "NUMBER(10,5)"
+    type = "NUMBER(10,10)"
   }
   column {
     name = "CUSTOMER_TYPE"
