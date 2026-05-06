@@ -1,11 +1,3 @@
-resource "snowflake_database" "db" {
-  name = "FINANCE_DB"
-}
-
-resource "snowflake_schema" "schema" {
-  database = snowflake_database.db.name
-  name     = "RAW"
-}
 
 ########################
 # DIM_CUSTOMERS
@@ -17,7 +9,7 @@ resource "snowflake_table" "dim_customers" {
 
   column {
     name = "CUSTOMER_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "CUSTOMER_ID"
@@ -33,11 +25,11 @@ resource "snowflake_table" "dim_customers" {
   }
   column {
     name = "REGION_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "ONBOARDING_DATE"
-    type = "DATE"
+    type = "STRING"
   }
   column {
     name = "STATUS"
@@ -53,7 +45,7 @@ resource "snowflake_table" "dim_customers" {
   }
   column {
     name = "BULK_PREFERENCE"
-    type = "BOOLEAN"
+    type = "STRING"
   }
   column {
     name = "LOYALTY_TIER"
@@ -69,7 +61,7 @@ resource "snowflake_table" "dim_customers" {
   }
   column {
     name = "CREDIT_SCORE"
-    type = "NUMBER"
+    type = "STRING"
   }
 }
 
@@ -83,7 +75,7 @@ resource "snowflake_table" "credit_policy" {
 
   column {
     name = "CREDIT_POLICY_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "POLICY_CODE"
@@ -99,31 +91,31 @@ resource "snowflake_table" "credit_policy" {
   }
   column {
     name = "CREDIT_LIMIT_AMOUNT"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "CREDIT_DAYS_LIMIT"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "BLOCK_ON_EXCEED"
-    type = "BOOLEAN"
+    type = "STRING"
   }
   column {
     name = "BLOCK_ON_OVERDUE_DAYS"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "REQUIRES_DEPOSIT"
-    type = "BOOLEAN"
+    type = "STRING"
   }
   column {
     name = "MINIMUM_DEPOSIT_AMOUNT"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "APPROVAL_REQUIRED"
-    type = "BOOLEAN"
+    type = "STRING"
   }
   column {
     name = "START_DATE"
@@ -131,7 +123,7 @@ resource "snowflake_table" "credit_policy" {
   }
   column {
     name = "END_DATE"
-    type = "FLOAT"
+    type = "STRING"
   }
 }
 
@@ -145,15 +137,15 @@ resource "snowflake_table" "customer_credit_mapping" {
 
   column {
     name = "CUSTOMER_CREDIT_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "CUSTOMER_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "CREDIT_POLICY_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "APPROVAL_STATUS"
@@ -173,7 +165,7 @@ resource "snowflake_table" "customer_credit_mapping" {
   }
   column {
     name = "EFFECTIVE_TO"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "IS_CURRENT"
@@ -191,7 +183,7 @@ resource "snowflake_table" "dim_date" {
 
   column {
     name = "DATE_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "FULL_DATE"
@@ -199,15 +191,15 @@ resource "snowflake_table" "dim_date" {
   }
   column {
     name = "YEAR"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "QUARTER"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "MONTH"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "MONTH_NAME"
@@ -215,11 +207,11 @@ resource "snowflake_table" "dim_date" {
   }
   column {
     name = "DAY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "DAY_OF_WEEK"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "DAY_NAME"
@@ -227,11 +219,11 @@ resource "snowflake_table" "dim_date" {
   }
   column {
     name = "IS_WEEKEND"
-    type = "BOOLEAN"
+    type = "STRING"
   }
   column {
     name = "IS_HOLIDAY"
-    type = "BOOLEAN"
+    type = "STRING"
   }
 }
 
@@ -245,7 +237,7 @@ resource "snowflake_table" "dim_employee" {
 
   column {
     name = "USER_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "USER_ID"
@@ -265,7 +257,7 @@ resource "snowflake_table" "dim_employee" {
   }
   column {
     name = "LOCATION_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "REPORTING_MANAGER"
@@ -291,7 +283,7 @@ resource "snowflake_table" "dim_location" {
 
   column {
     name = "LOCATION_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "LOCATION_ID"
@@ -319,7 +311,7 @@ resource "snowflake_table" "dim_location" {
   }
   column {
     name = "REGION_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "MANAGER_NAME"
@@ -337,7 +329,7 @@ resource "snowflake_table" "dim_products" {
 
   column {
     name = "PRODUCT_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "PRODUCT_ID"
@@ -353,35 +345,35 @@ resource "snowflake_table" "dim_products" {
   }
   column {
     name = "HSN_CODE"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "GST_RATE_PERCENT"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "CGST_PERCENT"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "SGST_PERCENT"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "IGST_PERCENT"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "COST_PRICE"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "SELLING_PRICE"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "BASE_PRICE"
-    type = "FLOAT"
+    type = "STRING"
   }
 }
 
@@ -395,7 +387,7 @@ resource "snowflake_table" "dim_region" {
 
   column {
     name = "REGION_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "REGION_CODE"
@@ -429,7 +421,7 @@ resource "snowflake_table" "dim_store" {
 
   column {
     name = "STORE_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "STORE_ID"
@@ -441,7 +433,7 @@ resource "snowflake_table" "dim_store" {
   }
   column {
     name = "LOCATION_KEY"
-    type = "NUMBER"
+    type = "STRING"
   }
   column {
     name = "GST_REGISTRATION_NO"
@@ -453,7 +445,7 @@ resource "snowflake_table" "dim_store" {
   }
   column {
     name = "CLOSING_DATE"
-    type = "FLOAT"
+    type = "STRING"
   }
   column {
     name = "STORE_MANAGER"
@@ -472,7 +464,7 @@ resource "snowflake_table" "fact_invoice_header" {
 
   column { 
     name = "INVOICE_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "INVOICE_ID" 
@@ -480,11 +472,11 @@ resource "snowflake_table" "fact_invoice_header" {
   }
   column { 
     name = "CUSTOMER_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "STORE_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "INVOICE_DATE" 
@@ -492,19 +484,19 @@ resource "snowflake_table" "fact_invoice_header" {
   }
   column { 
     name = "TOTAL_AMOUNT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "TOTAL_TAX" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "DISCOUNT_AMOUNT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "NET_AMOUNT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "PAYMENT_STATUS" 
@@ -527,35 +519,35 @@ resource "snowflake_table" "fact_invoice_line_item" {
 
   column { 
     name = "LINE_ITEM_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "INVOICE_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "PRODUCT_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "QUANTITY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "UNIT_PRICE" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "DISCOUNT_PERCENT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "TAX_PERCENT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "LINE_TOTAL" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
 }
 
@@ -566,15 +558,15 @@ resource "snowflake_table" "fact_payment_b2b_b2d" {
 
   column { 
     name = "PAYMENT_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "INVOICE_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "CUSTOMER_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "PAYMENT_DATE" 
@@ -586,7 +578,7 @@ resource "snowflake_table" "fact_payment_b2b_b2d" {
   }
   column { 
     name = "PAID_AMOUNT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "REFERENCE_NUMBER" 
@@ -605,11 +597,11 @@ resource "snowflake_table" "fact_payment_b2c" {
 
   column { 
     name = "PAYMENT_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "STORE_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "PAYMENT_DATE" 
@@ -621,7 +613,7 @@ resource "snowflake_table" "fact_payment_b2c" {
   }
   column { 
     name = "TOTAL_AMOUNT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "REFERENCE_NUMBER" 
@@ -640,15 +632,15 @@ resource "snowflake_table" "fact_returns" {
 
   column { 
     name = "RETURN_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "INVOICE_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "PRODUCT_KEY" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "RETURN_DATE" 
@@ -656,11 +648,11 @@ resource "snowflake_table" "fact_returns" {
   }
   column { 
     name = "QUANTITY_RETURNED" 
-    type = "NUMBER" 
+    type = "STRING" 
   }
   column { 
     name = "RETURN_AMOUNT" 
-    type = "FLOAT" 
+    type = "STRING" 
   }
   column { 
     name = "REASON" 
