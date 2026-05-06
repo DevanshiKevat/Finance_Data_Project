@@ -1,4 +1,11 @@
+resource "snowflake_database" "db" {
+  name = "FINANCE_DB"
+}
 
+resource "snowflake_schema" "schema" {
+  database = snowflake_database.db.name
+  name     = "RAW"
+}
 ########################
 # DIM_CUSTOMERS
 ########################
