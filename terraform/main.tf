@@ -1,5 +1,5 @@
 resource "snowflake_database" "db" {
-  name = "FINANCE_DATA_DB"
+  name = "FINANCE_DB"
 }
 
 resource "snowflake_schema" "schema" {
