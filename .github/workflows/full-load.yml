@@ -1,0 +1,41 @@
+name: 2 - Historical Full Load
+
+on:
+  workflow_dispatch:   # manual only — run once
+
+jobs:
+  full-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run full_Load.py
+        env:
+          OUTPUT_PATH: ./data
+        run: python scripts/full_Load.py
+
+      - name: Upload CSVs to Snowflake internal stage + COPY INTO
+        env:
+          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
+          OUTPUT_PATH:         ./data
+        run: python scripts/upload_to_snowflake.py --mode full
+
+      - name: Persist state files as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-state
+          path: |
+            data/state/checkpoint.json
+            data/state/open_invoices.json
+          retention-days: 90
