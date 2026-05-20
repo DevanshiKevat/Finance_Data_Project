@@ -1,0 +1,72 @@
+name: 3 - Daily Incremental
+
+on:
+  schedule:
+    - cron: "0 6 * * *"    # 06:00 UTC every day
+  workflow_dispatch:
+    inputs:
+      run_date:
+        description: "Override date (YYYY-MM-DD), leave blank for today"
+        required: false
+
+jobs:
+  incremental:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Restore the latest state files saved by previous run
+      - name: Restore pipeline state
+        uses: actions/download-artifact@v4
+        with:
+          name: pipeline-state
+          path: data/state/
+
+      - name: Run incremental_daily.py
+        env:
+          OUTPUT_PATH: ./data
+        run: |
+          if [ -n "${{ github.event.inputs.run_date }}" ]; then
+            python scripts/incremental_daily.py --mode daily --date "${{ github.event.inputs.run_date }}"
+          else
+            python scripts/incremental_daily.py --mode daily
+          fi
+
+      - name: Upload incremental CSVs to Snowflake + COPY INTO
+        env:
+          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
+          OUTPUT_PATH:         ./data
+        run: python scripts/upload_to_snowflake.py --mode incremental
+
+      - name: Run dbt transformations
+        env:
+          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+        run: |
+          pip install dbt-snowflake
+          cd dbt_project
+          dbt run
+          dbt test
+
+      # Save updated state for the next day's run
+      - name: Save updated pipeline state
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-state
+          path: |
+            data/state/checkpoint.json
+            data/state/open_invoices.json
+          retention-days: 90
+          overwrite: true    # replaces yesterday's artifact
