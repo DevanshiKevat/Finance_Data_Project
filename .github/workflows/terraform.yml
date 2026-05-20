@@ -1,34 +1,29 @@
-name: Terraform Snowflake Deployment
+name: 1 - Provision Snowflake (Terraform)
 
 on:
+  push:
+    paths: ["terraform/**"]
   workflow_dispatch:
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
-    env:
-      TF_VAR_snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-      TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
-      TF_VAR_snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
-      TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
-      TF_VAR_snowflake_role: ${{ secrets.SNOWFLAKE_ROLE }}
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
 
-      - name: Terraform Init
+      - name: Terraform init
+        working-directory: terraform
         run: terraform init
-        working-directory: ./terraform
-        
-      - name: Terraform Plan
-        run: terraform plan -input=false
-        working-directory: ./terraform
 
-      - name: Terraform Apply
+      - name: Terraform apply
+        working-directory: terraform
+        env:
+          TF_VAR_snowflake_account:  ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          TF_VAR_snowflake_user:     ${{ secrets.SNOWFLAKE_USER }}
+          TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          TF_VAR_snowflake_role:     ${{ secrets.SNOWFLAKE_ROLE }}
         run: terraform apply -auto-approve
-        working-directory: ./terraform
