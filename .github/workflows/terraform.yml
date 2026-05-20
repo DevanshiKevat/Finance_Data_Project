@@ -19,11 +19,22 @@ jobs:
         working-directory: terraform
         run: terraform init
 
-      - name: Terraform apply
+      - name: Terraform plan          # ← ADD THIS STEP (optional but good practice)
         working-directory: terraform
         env:
-          TF_VAR_snowflake_account:  ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          TF_VAR_snowflake_user:     ${{ secrets.SNOWFLAKE_USER }}
-          TF_VAR_snowflake_password: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          TF_VAR_snowflake_role:     ${{ secrets.SNOWFLAKE_ROLE }}
+          TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
+          TF_VAR_snowflake_account:      ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          TF_VAR_snowflake_user:         ${{ secrets.SNOWFLAKE_USER }}
+          TF_VAR_snowflake_password:     ${{ secrets.SNOWFLAKE_PASSWORD }}
+          TF_VAR_snowflake_role:         ${{ secrets.SNOWFLAKE_ROLE }}
+        run: terraform plan -input=false
+
+      - name: Terraform apply          # ← THIS IS WHERE THE SNIPPET GOES
+        working-directory: terraform
+        env:
+          TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
+          TF_VAR_snowflake_account:      ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          TF_VAR_snowflake_user:         ${{ secrets.SNOWFLAKE_USER }}
+          TF_VAR_snowflake_password:     ${{ secrets.SNOWFLAKE_PASSWORD }}
+          TF_VAR_snowflake_role:         ${{ secrets.SNOWFLAKE_ROLE }}
         run: terraform apply -auto-approve
