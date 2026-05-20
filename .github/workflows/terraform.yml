@@ -5,6 +5,10 @@ on:
     paths: ["terraform/**"]
   workflow_dispatch:
 
+concurrency:
+  group: terraform-snowflake
+  cancel-in-progress: true        # ← cancels older run automatically
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
@@ -19,7 +23,7 @@ jobs:
         working-directory: terraform
         run: terraform init
 
-      - name: Terraform plan          # ← ADD THIS STEP (optional but good practice)
+      - name: Terraform plan
         working-directory: terraform
         env:
           TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
@@ -27,9 +31,9 @@ jobs:
           TF_VAR_snowflake_user:         ${{ secrets.SNOWFLAKE_USER }}
           TF_VAR_snowflake_password:     ${{ secrets.SNOWFLAKE_PASSWORD }}
           TF_VAR_snowflake_role:         ${{ secrets.SNOWFLAKE_ROLE }}
-        run: terraform plan -input=false
+        run: terraform plan -input=false -no-color
 
-      - name: Terraform apply          # ← THIS IS WHERE THE SNIPPET GOES
+      - name: Terraform apply
         working-directory: terraform
         env:
           TF_VAR_snowflake_organization: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
@@ -37,4 +41,4 @@ jobs:
           TF_VAR_snowflake_user:         ${{ secrets.SNOWFLAKE_USER }}
           TF_VAR_snowflake_password:     ${{ secrets.SNOWFLAKE_PASSWORD }}
           TF_VAR_snowflake_role:         ${{ secrets.SNOWFLAKE_ROLE }}
-        run: terraform apply -auto-approve
+        run: terraform apply -input=false -auto-approve -no-color
