@@ -20,7 +20,7 @@ resource "snowflake_database" "finance" {
 }
 
 resource "snowflake_warehouse" "compute" {
-  name           = "COMPUTE_WH"
+  name           = "FINANCE_WH"
   warehouse_size = "XSMALL"
   auto_suspend   = 60
   auto_resume    = true
