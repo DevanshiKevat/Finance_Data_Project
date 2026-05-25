@@ -21,14 +21,15 @@ jobs:
           OUTPUT_PATH: ./data
         run: python Scripts/full_Load.py
 
-      - name: Upload CSVs to Snowflake internal stage + COPY INTO
+      - name: Upload to Snowflake
         env:
-          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
-          OUTPUT_PATH:         ./data
+          SNOWFLAKE_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}  
+          SNOWFLAKE_ACCOUNT:      ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:         ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD:     ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_WAREHOUSE:    ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE:     ${{ secrets.SNOWFLAKE_DATABASE }}
+          OUTPUT_PATH:            ./data
         run: python Scripts/upload_to_snowflake.py --mode full
 
       - name: Persist state files as artifact
