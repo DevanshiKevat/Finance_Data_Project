@@ -28,6 +28,7 @@ jobs:
         with:
           name: pipeline-state
           path: data/state/
+        continue-on-error: true   
 
       - name: Run incremental_daily.py
         env:
