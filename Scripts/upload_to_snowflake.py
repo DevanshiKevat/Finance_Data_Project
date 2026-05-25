@@ -36,21 +36,21 @@ def get_conn():
         user=os.environ["SNOWFLAKE_USER"],
         password=os.environ["SNOWFLAKE_PASSWORD"],
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
-        database=os.environ.get("SNOWFLAKE_DATABASE", "ANALYTICS_DB"),
+        database=os.environ.get("SNOWFLAKE_DATABASE", "FINANCE_DATA_DB"),
         schema="RAW",
     )
     
 def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
-    print(f"  PUT {local_path} → @MY_STAGE/{stage_file}")
+    print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_file}")
     cursor.execute(f"""
         PUT file://{local_path}
-        @MY_STAGE/{stage_file}
+        @FINANCE_STAGE/{stage_file}
         AUTO_COMPRESS=TRUE OVERWRITE=TRUE
     """)
     print(f"  COPY INTO {table_name}")
     cursor.execute(f"""
         COPY INTO RAW.{table_name}
-        FROM @MY_STAGE/{stage_file}.gz
+        FROM @FINANCE_STAGE/{stage_file}.gz
         FILE_FORMAT = (
             TYPE = 'CSV'
             FIELD_OPTIONALLY_ENCLOSED_BY = '"'
