@@ -27,11 +27,18 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Restore pipeline state
+        id: restore
         uses: actions/download-artifact@v4
         with:
           name: pipeline-state
-          path: data/state/          # ← no prefix
+          path: data/state/
         continue-on-error: true
+
+      - name: Check restore status
+        run: |
+          echo "Restore outcome: ${{ steps.restore.outcome }}"
+          echo "Restore result: ${{ steps.restore.conclusion }}"
+          ls -la data/state/ 2>/dev/null || echo "No state directory yet — first run"
 
       - name: Run full load if no checkpoint
         env:
