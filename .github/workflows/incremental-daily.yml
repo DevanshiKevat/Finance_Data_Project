@@ -12,9 +12,7 @@ on:
 jobs:
   incremental:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Finance_Data_Project   # ← fixes all path issues
+    # NO defaults.run.working-directory here
 
     steps:
       - name: Checkout repository
@@ -32,7 +30,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: pipeline-state
-          path: Finance_Data_Project/data/state/   # ← full path for actions
+          path: data/state/          # ← no prefix
         continue-on-error: true
 
       - name: Run full load if no checkpoint
@@ -72,7 +70,7 @@ jobs:
         with:
           name: pipeline-state
           path: |
-            Finance_Data_Project/data/state/checkpoint.json
-            Finance_Data_Project/data/state/open_invoices.json
+            data/state/checkpoint.json
+            data/state/open_invoices.json
           retention-days: 90
           overwrite: true
