@@ -104,18 +104,22 @@ jobs:
     # Upload to Snowflake
     ###################################
 
+    ###################################
+# Upload to Snowflake
+###################################
+    
     - name: Upload incremental CSVs to Snowflake
       env:
+        SNOWFLAKE_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
         SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
         SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
         SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
         SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
         SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-
+    
       run: |
-
-        python Scripts/upload_to_snowflake.py \
-        --mode incremental
+          python Scripts/upload_to_snowflake.py \
+          --mode incremental
 
 
     ###################################
