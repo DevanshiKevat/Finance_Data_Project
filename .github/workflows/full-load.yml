@@ -19,7 +19,7 @@ jobs:
       - name: Run full_Load.py
         env:
           OUTPUT_PATH: ./data
-        run: python scripts/full_Load.py
+        run: python Scripts/full_Load.py
 
       - name: Upload CSVs to Snowflake internal stage + COPY INTO
         env:
@@ -29,7 +29,7 @@ jobs:
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
           OUTPUT_PATH:         ./data
-        run: python scripts/upload_to_snowflake.py --mode full
+        run: python Scripts/upload_to_snowflake.py --mode full
 
       - name: Persist state files as artifact
         uses: actions/upload-artifact@v4
