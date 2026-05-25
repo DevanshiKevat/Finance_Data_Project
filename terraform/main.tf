@@ -50,7 +50,7 @@ resource "snowflake_stage" "internal_stage" {
 # ── DIM Tables ──────────────────────────────────────────
 
 resource "snowflake_table" "dim_date" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "DIM_DATE"
   column {
@@ -100,7 +100,7 @@ resource "snowflake_table" "dim_date" {
 }
 
 resource "snowflake_table" "dim_region" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "DIM_REGION"
   column {
@@ -130,7 +130,7 @@ resource "snowflake_table" "dim_region" {
 }
 
 resource "snowflake_table" "dim_location" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "DIM_LOCATION"
   column {
@@ -172,7 +172,7 @@ resource "snowflake_table" "dim_location" {
 }
 
 resource "snowflake_table" "dim_employee" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "DIM_EMPLOYEE"
   column {
@@ -214,7 +214,7 @@ resource "snowflake_table" "dim_employee" {
 }
 
 resource "snowflake_table" "dim_products" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "DIM_PRODUCTS"
   column {
@@ -268,7 +268,7 @@ resource "snowflake_table" "dim_products" {
 }
 
 resource "snowflake_table" "dim_customers" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "DIM_CUSTOMERS"
   column {
@@ -338,7 +338,7 @@ resource "snowflake_table" "dim_customers" {
 }
 
 resource "snowflake_table" "dim_store" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "DIM_STORE"
   column {
@@ -376,7 +376,7 @@ resource "snowflake_table" "dim_store" {
 }
 
 resource "snowflake_table" "credit_policy" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "CREDIT_POLICY"
   column {
@@ -434,7 +434,7 @@ resource "snowflake_table" "credit_policy" {
 }
 
 resource "snowflake_table" "customer_credit_mapping" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "CUSTOMER_CREDIT_MAPPING"
   column {
@@ -478,7 +478,7 @@ resource "snowflake_table" "customer_credit_mapping" {
 # ── FACT Tables ─────────────────────────────────────────
 
 resource "snowflake_table" "fact_invoice_header" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "FACT_INVOICE_HEADER"
   column {
@@ -592,7 +592,7 @@ resource "snowflake_table" "fact_invoice_header" {
 }
 
 resource "snowflake_table" "fact_invoice_line_item" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "FACT_INVOICE_LINE_ITEM"
   column {
@@ -666,7 +666,7 @@ resource "snowflake_table" "fact_invoice_line_item" {
 }
 
 resource "snowflake_table" "fact_payment_b2b_b2d" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "FACT_PAYMENT_B2B_B2D"
   column {
@@ -728,7 +728,7 @@ resource "snowflake_table" "fact_payment_b2b_b2d" {
 }
 
 resource "snowflake_table" "fact_payment_b2c" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "FACT_PAYMENT_B2C"
   column {
@@ -798,7 +798,7 @@ resource "snowflake_table" "fact_payment_b2c" {
 }
 
 resource "snowflake_table" "fact_returns" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.FINANCE_DATA_DB.name
   schema   = snowflake_schema.raw.name
   name     = "FACT_RETURNS"
   column {
