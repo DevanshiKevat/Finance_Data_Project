@@ -2,7 +2,7 @@ name: 3 - Daily Incremental
 
 on:
   schedule:
-    - cron: "0 6 * * *"    # 06:00 UTC every day
+    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       run_date:
@@ -12,31 +12,29 @@ on:
 jobs:
   incremental:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Finance_Data_Project   # ← fixes all path issues
 
     steps:
-      # ── 1. Checkout ─────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Python setup ─────────────────────────────────────────
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ── 3. Install dependencies ──────────────────────────────────
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # ── 4. Restore pipeline state from previous run ──────────────
       - name: Restore pipeline state
         uses: actions/download-artifact@v4
         with:
           name: pipeline-state
-          path: data/state/
-        continue-on-error: true   # First-ever run has no artifact yet
+          path: Finance_Data_Project/data/state/   # ← full path for actions
+        continue-on-error: true
 
-            # ── 5. Bootstrap ────────────────────────────────────────────
       - name: Run full load if no checkpoint
         env:
           OUTPUT_PATH: ./data
@@ -47,8 +45,7 @@ jobs:
           else
             echo "Checkpoint found — skipping full load."
           fi
-      
-      # ── 6. Daily incremental run ─────────────────────────────────
+
       - name: Run incremental_daily.py
         env:
           OUTPUT_PATH: ./data
@@ -58,8 +55,7 @@ jobs:
           else
             python incremental_daily.py --mode daily
           fi
-      
-      # ── 7. Upload to Snowflake ────────────────────────────────────
+
       - name: Upload incremental CSVs to Snowflake + COPY INTO
         env:
           SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -69,15 +65,14 @@ jobs:
           SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
           OUTPUT_PATH:         ./data
         run: python upload_to_snowflake.py --mode incremental
-      
-      # ── 8. Save updated state for next run ───────────────────────
+
       - name: Save updated pipeline state
-        if: always()    # Save state even if a step failed
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-state
           path: |
-            data/state/checkpoint.json
-            data/state/open_invoices.json
+            Finance_Data_Project/data/state/checkpoint.json
+            Finance_Data_Project/data/state/open_invoices.json
           retention-days: 90
-          overwrite: true    # Replaces previous day's artifact
+          overwrite: true
