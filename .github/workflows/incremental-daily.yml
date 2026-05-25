@@ -30,6 +30,15 @@ jobs:
           path: data/state/
         continue-on-error: true   
 
+      - name: Run full load if no checkpoint
+        run: |
+          if [ ! -f ./data/state/checkpoint.json ]; then
+            echo "No checkpoint found, running full load..."
+            python incremental_daily.py --mode full
+          else
+            echo "Checkpoint found, skipping full load."
+          fi
+
       - name: Run incremental_daily.py
         env:
           OUTPUT_PATH: ./data
