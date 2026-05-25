@@ -22,13 +22,17 @@ INCREMENTAL_TABLES = [
 ]
 
 def get_conn():
+    org     = os.environ["SNOWFLAKE_ORGANIZATION"]
+    account = os.environ["SNOWFLAKE_ACCOUNT"]
+    
     return snowflake.connector.connect(
-        account=os.environ["SNOWFLAKE_ACCOUNT"],
+        account=f"{org}-{account}",          # ← combine them with a dash
         user=os.environ["SNOWFLAKE_USER"],
         password=os.environ["SNOWFLAKE_PASSWORD"],
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
         database=os.environ.get("SNOWFLAKE_DATABASE", "ANALYTICS_DB"),
-        schema="RAW",
+        schema="RAW"
+    
     )
 
 def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
