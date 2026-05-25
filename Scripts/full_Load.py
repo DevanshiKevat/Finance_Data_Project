@@ -1549,7 +1549,7 @@ class FinancialDataGenerator:
         # Recalculate tracker from invoices so both sides use the same logic
         recalc_tracker = sum(self.customer_outstanding.values())
 
-        if abs(recalc_tracker - total_outstanding_from_invoices) > 10000:
+       if abs(recalc_tracker - total_outstanding_from_invoices) > 10000:
             logger.warning(
                 f"⚠️  Outstanding balance drift: "
                 f"tracker=₹{recalc_tracker:,.2f}  invoices=₹{total_outstanding_from_invoices:,.2f}  "
