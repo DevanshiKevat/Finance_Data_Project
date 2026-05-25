@@ -3,81 +3,136 @@ name: 3 - Daily Incremental
 on:
   schedule:
     - cron: "0 6 * * *"
+
   workflow_dispatch:
     inputs:
       run_date:
-        description: "Override date (YYYY-MM-DD), leave blank for today"
+        description: "Override date (YYYY-MM-DD)"
         required: false
 
 jobs:
   incremental:
     runs-on: ubuntu-latest
-    # NO defaults.run.working-directory here
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
 
-      - name: Restore pipeline state
-        id: restore
-        uses: actions/download-artifact@v4
-        with:
-          name: pipeline-state
-          path: data/state/
-        continue-on-error: true
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
 
-      - name: Check restore status
-        run: |
-          echo "Restore outcome: ${{ steps.restore.outcome }}"
-          echo "Restore result: ${{ steps.restore.conclusion }}"
-          ls -la data/state/ 2>/dev/null || echo "No state directory yet — first run"
 
-      - name: Run full load if no checkpoint
-        env:
-          OUTPUT_PATH: ./data
-        run: |
-          if [ ! -f ./data/state/checkpoint.json ]; then
-            echo "No checkpoint found — running full load..."
-            python incremental_daily.py --mode full
-          else
-            echo "Checkpoint found — skipping full load."
-          fi
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Run incremental_daily.py
-        env:
-          OUTPUT_PATH: ./data
-        run: |
-          if [ -n "${{ github.event.inputs.run_date }}" ]; then
-            python incremental_daily.py --mode daily --date "${{ github.event.inputs.run_date }}"
-          else
-            python incremental_daily.py --mode daily
-          fi
 
-      - name: Upload incremental CSVs to Snowflake + COPY INTO
-        env:
-          SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
-          OUTPUT_PATH:         ./data
-        run: python upload_to_snowflake.py --mode incremental
+    ###################################
+    # Restore checkpoint
+    ###################################
 
-      - name: Save updated pipeline state
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pipeline-state
-          path: |
-            data/state/checkpoint.json
-            data/state/open_invoices.json
-          retention-days: 90
-          overwrite: true
+    - name: Restore pipeline state
+      id: restore
+      uses: actions/download-artifact@v4
+      with:
+        name: pipeline-state
+        path: data/state/
+      continue-on-error: true
+
+
+    - name: Check restore status
+      run: |
+        echo "Restore outcome: ${{ steps.restore.outcome }}"
+        ls -la data/state/ || echo "First run — no checkpoint"
+
+
+    ###################################
+    # First run → Full load
+    ###################################
+
+    - name: Run full load if checkpoint missing
+      env:
+        OUTPUT_PATH: ./data
+
+      run: |
+        if [ ! -f data/state/checkpoint.json ]; then
+
+          echo "No checkpoint found"
+          echo "Running FULL LOAD"
+
+          python Scripts/incremental_daily.py \
+          --mode full
+
+        else
+
+          echo "Checkpoint exists"
+          echo "Skipping full load"
+
+        fi
+
+
+    ###################################
+    # Daily Incremental
+    ###################################
+
+    - name: Run incremental pipeline
+      env:
+        OUTPUT_PATH: ./data
+
+      run: |
+
+        if [ -n "${{ github.event.inputs.run_date }}" ]; then
+
+          python Scripts/incremental_daily.py \
+          --mode daily \
+          --date "${{ github.event.inputs.run_date }}"
+
+        else
+
+          python Scripts/incremental_daily.py \
+          --mode daily
+
+        fi
+
+
+    ###################################
+    # Upload to Snowflake
+    ###################################
+
+    - name: Upload incremental CSVs to Snowflake
+      env:
+        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+
+      run: |
+
+        python Scripts/upload_to_snowflake.py \
+        --mode incremental
+
+
+    ###################################
+    # Save checkpoint
+    ###################################
+
+    - name: Save updated pipeline state
+      if: always()
+
+      uses: actions/upload-artifact@v4
+
+      with:
+        name: pipeline-state
+
+        path: |
+          data/state/checkpoint.json
+          data/state/open_invoices.json
+
+        overwrite: true
+        retention-days: 90  
