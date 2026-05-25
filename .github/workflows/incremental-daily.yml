@@ -36,32 +36,30 @@ jobs:
           path: data/state/
         continue-on-error: true   # First-ever run has no artifact yet
 
-      # ── 5. Bootstrap: full load if no checkpoint exists ──────────
+            # ── 5. Bootstrap ────────────────────────────────────────────
       - name: Run full load if no checkpoint
         env:
           OUTPUT_PATH: ./data
         run: |
           if [ ! -f ./data/state/checkpoint.json ]; then
-            echo "No checkpoint found — running full load to bootstrap state..."
-            python scripts/incremental_daily.py --mode full
+            echo "No checkpoint found — running full load..."
+            python incremental_daily.py --mode full
           else
             echo "Checkpoint found — skipping full load."
           fi
-
+      
       # ── 6. Daily incremental run ─────────────────────────────────
       - name: Run incremental_daily.py
         env:
           OUTPUT_PATH: ./data
         run: |
           if [ -n "${{ github.event.inputs.run_date }}" ]; then
-            echo "Running for override date: ${{ github.event.inputs.run_date }}"
-            python scripts/incremental_daily.py --mode daily --date "${{ github.event.inputs.run_date }}"
+            python incremental_daily.py --mode daily --date "${{ github.event.inputs.run_date }}"
           else
-            echo "Running for today's date"
-            python scripts/incremental_daily.py --mode daily
+            python incremental_daily.py --mode daily
           fi
-
-      # ── 7. Upload CSVs to Snowflake ──────────────────────────────
+      
+      # ── 7. Upload to Snowflake ────────────────────────────────────
       - name: Upload incremental CSVs to Snowflake + COPY INTO
         env:
           SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -70,8 +68,8 @@ jobs:
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE }}
           OUTPUT_PATH:         ./data
-        run: python scripts/upload_to_snowflake.py --mode incremental
-
+        run: python upload_to_snowflake.py --mode incremental
+      
       # ── 8. Save updated state for next run ───────────────────────
       - name: Save updated pipeline state
         if: always()    # Save state even if a step failed
