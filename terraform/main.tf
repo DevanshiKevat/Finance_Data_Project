@@ -16,7 +16,7 @@ provider "snowflake" {
 }
 
 resource "snowflake_database" "finance" {
-  name = "DINANCE_DATA_DB"
+  name = "FINANCE_DATA_DB"
 }
 
 resource "snowflake_warehouse" "compute" {
