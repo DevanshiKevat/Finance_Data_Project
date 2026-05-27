@@ -42,12 +42,9 @@ def get_conn():
 
 
 def put_and_copy(cursor, local_path: str, stage_path: str, table_name: str):
-    """
-    PUT the local CSV to the stage, then COPY INTO the table.
-    stage_path should have NO .csv extension — Snowflake appends the
-    filename automatically, avoiding the double-path duplication bug.
-    Column mapping is positional (SKIP_HEADER=1), no explicit col list needed.
-    """
+    
+    # Get just the filename without extension
+    filename = os.path.basename(local_path)  # e.g. FACT_RETURNS.csv
 
     print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_path}")
     cursor.execute(f"""
@@ -56,10 +53,12 @@ def put_and_copy(cursor, local_path: str, stage_path: str, table_name: str):
         AUTO_COMPRESS=TRUE OVERWRITE=TRUE
     """)
 
-    print(f"  COPY INTO {table_name}")
+    # COPY FROM the actual path where Snowflake stored the file
+    actual_stage_path = f"{stage_path}/{filename}.gz"
+    print(f"  COPY INTO {table_name} FROM @FINANCE_STAGE/{actual_stage_path}")
     cursor.execute(f"""
         COPY INTO RAW.{table_name}
-        FROM @FINANCE_STAGE/{stage_path}.gz
+        FROM @FINANCE_STAGE/{actual_stage_path}
         FILE_FORMAT = (
             TYPE                         = 'CSV'
             FIELD_OPTIONALLY_ENCLOSED_BY = '"'
