@@ -1,5 +1,4 @@
 import os
-import glob
 import argparse
 import snowflake.connector
 from datetime import date
@@ -20,6 +19,7 @@ INCREMENTAL_TABLES = [
     ("FACT_PAYMENT_B2C_new",        "FACT_PAYMENT_B2C"),
     ("FACT_RETURNS_new",            "FACT_RETURNS"),
 ]
+
 
 def get_conn():
     required = ["SNOWFLAKE_ORGANIZATION", "SNOWFLAKE_ACCOUNT",
@@ -49,9 +49,11 @@ def get_csv_columns(local_path: str):
 
 
 def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
-    # Read column order from the CSV header
     csv_cols = get_csv_columns(local_path)
     col_list = ", ".join(csv_cols)
+
+    # Single $ for Snowflake positional column references
+    select_cols = ", ".join(f"${i+1}" for i in range(len(csv_cols)))
 
     print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_file}")
     cursor.execute(f"""
@@ -64,7 +66,7 @@ def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
     cursor.execute(f"""
         COPY INTO RAW.{table_name} ({col_list})
         FROM (
-            SELECT {", ".join(f"$${i+1}" for i in range(len(csv_cols)))}
+            SELECT {select_cols}
             FROM @FINANCE_STAGE/{stage_file}.gz
         )
         FILE_FORMAT = (
@@ -76,7 +78,6 @@ def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
         ON_ERROR = 'ABORT_STATEMENT'
     """)
 
-    # Print copy results
     results = cursor.fetchall()
     for row in results:
         print(f"    → {row}")
