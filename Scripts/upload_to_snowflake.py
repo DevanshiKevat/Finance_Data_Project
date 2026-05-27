@@ -42,9 +42,9 @@ def get_conn():
 
 
 def put_and_copy(cursor, local_path: str, stage_path: str, table_name: str):
-    
-    # Get just the filename without extension
-    filename = os.path.basename(local_path)  # e.g. FACT_RETURNS.csv
+    filename = os.path.basename(local_path)
+    actual_stage_path = f"{stage_path}/{filename}.gz"
+    db = os.environ.get("SNOWFLAKE_DATABASE", "FINANCE_DATA_DB")
 
     print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_path}")
     cursor.execute(f"""
@@ -53,12 +53,10 @@ def put_and_copy(cursor, local_path: str, stage_path: str, table_name: str):
         AUTO_COMPRESS=TRUE OVERWRITE=TRUE
     """)
 
-    # COPY FROM the actual path where Snowflake stored the file
-    actual_stage_path = f"{stage_path}/{filename}.gz"
-    print(f"  COPY INTO {table_name} FROM @FINANCE_STAGE/{actual_stage_path}")
+    print(f"  COPY INTO {db}.RAW.{table_name} FROM @FINANCE_STAGE/{actual_stage_path}")
     cursor.execute(f"""
-        COPY INTO RAW.{table_name}
-        FROM @FINANCE_STAGE/{actual_stage_path}
+        COPY INTO {db}.RAW.{table_name}
+        FROM '@"{db}"."RAW"."FINANCE_STAGE"/{actual_stage_path}'
         FILE_FORMAT = (
             TYPE                         = 'CSV'
             FIELD_OPTIONALLY_ENCLOSED_BY = '"'
