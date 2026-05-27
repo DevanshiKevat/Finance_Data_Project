@@ -41,38 +41,31 @@ def get_conn():
     )
 
 
-def get_csv_columns(local_path: str):
-    with open(local_path, encoding="utf-8") as f:
-        header = f.readline().strip()
-    cols = [col.strip().strip('"').lower() for col in header.split(",")]
-    print(f"  CSV columns: {cols}")   # ← add this
-    return cols
+def put_and_copy(cursor, local_path: str, stage_path: str, table_name: str):
+    """
+    PUT the local CSV to the stage, then COPY INTO the table.
+    stage_path should have NO .csv extension — Snowflake appends the
+    filename automatically, avoiding the double-path duplication bug.
+    Column mapping is positional (SKIP_HEADER=1), no explicit col list needed.
+    """
 
-
-def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
-    csv_cols = get_csv_columns(local_path)
-    col_list = ", ".join(col.upper() for col in csv_cols)
-    select_cols = ", ".join(f"${i+1}" for i in range(len(csv_cols)))
-
-    print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_file}")
+    print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_path}")
     cursor.execute(f"""
         PUT file://{local_path}
-        @FINANCE_STAGE/{stage_file}
+        @FINANCE_STAGE/{stage_path}
         AUTO_COMPRESS=TRUE OVERWRITE=TRUE
     """)
 
-    print(f"  COPY INTO {table_name} ({col_list})")
+    print(f"  COPY INTO {table_name}")
     cursor.execute(f"""
-        COPY INTO RAW.{table_name} ({col_list})
-        FROM (
-            SELECT {select_cols}
-            FROM @FINANCE_STAGE/{stage_file}.gz
-        )
+        COPY INTO RAW.{table_name}
+        FROM @FINANCE_STAGE/{stage_path}.gz
         FILE_FORMAT = (
-            TYPE = 'CSV'
+            TYPE                         = 'CSV'
             FIELD_OPTIONALLY_ENCLOSED_BY = '"'
-            SKIP_HEADER = 1
-            NULL_IF = ('', 'None', 'NULL')
+            SKIP_HEADER                  = 1
+            NULL_IF                      = ('', 'None', 'NULL')
+            EMPTY_FIELD_AS_NULL          = TRUE
         )
         ON_ERROR = 'ABORT_STATEMENT'
     """)
@@ -85,12 +78,15 @@ def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
 def run_full(conn):
     base = os.path.join(os.environ.get("OUTPUT_PATH", "./data"), "full_load")
     cursor = conn.cursor()
+
     for table in FULL_LOAD_TABLES:
         path = os.path.join(base, f"{table}.csv")
         if not os.path.exists(path):
             print(f"  SKIP {table} (file not found)")
             continue
-        put_and_copy(cursor, os.path.abspath(path), f"full/{table}.csv", table)
+        # stage_path has no .csv — avoids DIM_DATE.csv/DIM_DATE.csv.gz duplication
+        put_and_copy(cursor, os.path.abspath(path), f"full/{table}", table)
+
     cursor.close()
     print("Full load upload complete.")
 
@@ -99,17 +95,21 @@ def run_incremental(conn):
     base = os.path.join(os.environ.get("OUTPUT_PATH", "./data"), "incremental")
     today = date.today().strftime("%Y%m%d")
     inc_dir = os.path.join(base, today)
+
     if not os.path.exists(inc_dir):
         print(f"No incremental dir found for {today}. Exiting.")
         return
+
     cursor = conn.cursor()
+
     for (file_stem, target_table) in INCREMENTAL_TABLES:
         path = os.path.join(inc_dir, f"{file_stem}.csv")
         if not os.path.exists(path):
             print(f"  SKIP {file_stem} (not generated today)")
             continue
         put_and_copy(cursor, os.path.abspath(path),
-                     f"incremental/{today}/{file_stem}.csv", target_table)
+                     f"incremental/{today}/{file_stem}", target_table)
+
     cursor.close()
     print("Incremental upload complete.")
 
@@ -118,6 +118,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["full", "incremental"], required=True)
     args = parser.parse_args()
+
     conn = get_conn()
     if args.mode == "full":
         run_full(conn)
