@@ -51,7 +51,7 @@ def get_csv_columns(local_path: str):
 
 def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
     csv_cols = get_csv_columns(local_path)
-    col_list = ", ".join(csv_cols)
+    col_list = ", ".join(col.upper() for col in csv_cols)
     select_cols = ", ".join(f"${i+1}" for i in range(len(csv_cols)))
 
     print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_file}")
