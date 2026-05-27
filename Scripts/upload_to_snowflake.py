@@ -46,6 +46,7 @@ def get_csv_columns(local_path: str):
     with open(local_path, encoding="utf-8") as f:
         header = f.readline().strip()
     # ← .lower() added: Snowflake table columns are defined in lowercase
+
     return [col.strip().strip('"').lower() for col in header.split(",")]
 
 
