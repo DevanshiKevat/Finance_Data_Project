@@ -42,12 +42,11 @@ def get_conn():
 
 
 def get_csv_columns(local_path: str):
-    """Read header row from CSV to get column names in order."""
     with open(local_path, encoding="utf-8") as f:
         header = f.readline().strip()
-    # ← .lower() added: Snowflake table columns are defined in lowercase
-
-    return [col.strip().strip('"').lower() for col in header.split(",")]
+    cols = [col.strip().strip('"').lower() for col in header.split(",")]
+    print(f"  CSV columns: {cols}")   # ← add this
+    return cols
 
 
 def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
