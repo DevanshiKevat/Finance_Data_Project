@@ -22,12 +22,12 @@ INCREMENTAL_TABLES = [
 ]
 
 def get_conn():
-    required = ["SNOWFLAKE_ORGANIZATION", "SNOWFLAKE_ACCOUNT", 
+    required = ["SNOWFLAKE_ORGANIZATION", "SNOWFLAKE_ACCOUNT",
                 "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD"]
     for var in required:
         if not os.environ.get(var):
             raise ValueError(f"Missing required env var: {var}")
-    
+
     org     = os.environ["SNOWFLAKE_ORGANIZATION"]
     account = os.environ["SNOWFLAKE_ACCOUNT"]
 
@@ -39,27 +39,48 @@ def get_conn():
         database=os.environ.get("SNOWFLAKE_DATABASE", "FINANCE_DATA_DB"),
         schema="RAW",
     )
-    
+
+
+def get_csv_columns(local_path: str):
+    """Read header row from CSV to get column names in order."""
+    with open(local_path, encoding="utf-8") as f:
+        header = f.readline().strip()
+    return [col.strip().strip('"') for col in header.split(",")]
+
+
 def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
+    # Read column order from the CSV header
+    csv_cols = get_csv_columns(local_path)
+    col_list = ", ".join(csv_cols)
+
     print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_file}")
     cursor.execute(f"""
         PUT file://{local_path}
         @FINANCE_STAGE/{stage_file}
         AUTO_COMPRESS=TRUE OVERWRITE=TRUE
     """)
-    print(f"  COPY INTO {table_name}")
+
+    print(f"  COPY INTO {table_name} ({col_list})")
     cursor.execute(f"""
-        COPY INTO RAW.{table_name}
-        FROM @FINANCE_STAGE/{stage_file}.gz
+        COPY INTO RAW.{table_name} ({col_list})
+        FROM (
+            SELECT {", ".join(f"$${i+1}" for i in range(len(csv_cols)))}
+            FROM @FINANCE_STAGE/{stage_file}.gz
+        )
         FILE_FORMAT = (
             TYPE = 'CSV'
             FIELD_OPTIONALLY_ENCLOSED_BY = '"'
             SKIP_HEADER = 1
             NULL_IF = ('', 'None', 'NULL')
         )
-        ON_ERROR = 'SKIP_FILE'
-        PURGE = TRUE
+        ON_ERROR = 'ABORT_STATEMENT'
     """)
+
+    # Print copy results
+    results = cursor.fetchall()
+    for row in results:
+        print(f"    → {row}")
+
 
 def run_full(conn):
     base = os.path.join(os.environ.get("OUTPUT_PATH", "./data"), "full_load")
@@ -72,6 +93,7 @@ def run_full(conn):
         put_and_copy(cursor, os.path.abspath(path), f"full/{table}.csv", table)
     cursor.close()
     print("Full load upload complete.")
+
 
 def run_incremental(conn):
     base = os.path.join(os.environ.get("OUTPUT_PATH", "./data"), "incremental")
@@ -90,6 +112,7 @@ def run_incremental(conn):
                      f"incremental/{today}/{file_stem}.csv", target_table)
     cursor.close()
     print("Incremental upload complete.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
