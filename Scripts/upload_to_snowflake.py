@@ -45,14 +45,13 @@ def get_csv_columns(local_path: str):
     """Read header row from CSV to get column names in order."""
     with open(local_path, encoding="utf-8") as f:
         header = f.readline().strip()
-    return [col.strip().strip('"') for col in header.split(",")]
+    # ← .lower() added: Snowflake table columns are defined in lowercase
+    return [col.strip().strip('"').lower() for col in header.split(",")]
 
 
 def put_and_copy(cursor, local_path: str, stage_file: str, table_name: str):
     csv_cols = get_csv_columns(local_path)
     col_list = ", ".join(csv_cols)
-
-    # Single $ for Snowflake positional column references
     select_cols = ", ".join(f"${i+1}" for i in range(len(csv_cols)))
 
     print(f"  PUT {local_path} → @FINANCE_STAGE/{stage_file}")
