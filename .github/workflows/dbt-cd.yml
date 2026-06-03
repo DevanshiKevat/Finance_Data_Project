@@ -1,0 +1,67 @@
+name: 5 - dbt CD (Deploy on merge)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dbt_project/**"    # triggers when dbt files merged to main
+  workflow_run:
+    workflows: ["3 - Daily Incremental"]   # also triggers after daily load
+    types: [completed]
+
+jobs:
+  dbt-cd:
+    runs-on: ubuntu-latest
+    # Only run if triggered by incremental workflow that succeeded
+    if: >
+      github.event_name == 'push' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install snowflake-connector-python
+
+      - name: Execute dbt inside Snowflake
+        env:
+          SNOWFLAKE_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
+          SNOWFLAKE_ACCOUNT:      ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:         ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD:     ${{ secrets.SNOWFLAKE_PASSWORD }}
+        run: |
+          python - <<'EOF'
+          import os
+          import snowflake.connector
+
+          conn = snowflake.connector.connect(
+              account=f"{os.environ['SNOWFLAKE_ORGANIZATION']}-{os.environ['SNOWFLAKE_ACCOUNT']}".lower(),
+              user=os.environ["SNOWFLAKE_USER"],
+              password=os.environ["SNOWFLAKE_PASSWORD"],
+              warehouse="COMPUTE_WH",
+              database="ANALYTICS_DB",
+          )
+          cursor = conn.cursor()
+
+          # Fetch latest changes from GitHub into Snowflake's Git repo object
+          print("Fetching latest code from GitHub...")
+          cursor.execute("ALTER GIT REPOSITORY finance_dbt_repo FETCH")
+
+          # Execute dbt project natively inside Snowflake
+          print("Running dbt inside Snowflake...")
+          cursor.execute("""
+              EXECUTE DBT PROJECT finance_dbt_project
+              USING WAREHOUSE COMPUTE_WH
+              WITH TARGET = 'prod'
+          """)
+          for row in cursor:
+              print(row)
+
+          cursor.close()
+          conn.close()
+          print("✅ dbt models deployed to STAGING + MARTS")
+          EOF
