@@ -6,7 +6,15 @@ Now generates: FACT_INVOICE_HEADER, FACT_INVOICE_LINE_ITEM,
               FACT_PAYMENT_B2B_B2D, FACT_PAYMENT_B2C, FACT_RETURNS
 ================================================================================
 """
-
+try:
+    from state_manager import (
+        save_checkpoint, load_checkpoint,
+        save_open_invoices, load_open_invoices
+    )
+    USE_SNOWFLAKE_STATE = True
+except ImportError:
+    USE_SNOWFLAKE_STATE = False
+  
 import csv
 import json
 import os
