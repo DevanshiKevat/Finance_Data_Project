@@ -102,15 +102,20 @@ class Checkpoint:
         self.return_sequence: Dict[int, int] = defaultdict(int)  # Track returns per invoice
 
     def save(self):
-        payload = {
-            'last_run_date': fmt_date(self.last_run_date),
-            'sequences': dict(self.sequences),
-            'customer_outstanding': {str(k): v for k, v in self.customer_outstanding.items()},
-            'last_purchase': {str(k): fmt_date(v) for k, v in self.last_purchase.items()},
-            'date_key_map': self.date_key_map,
-            'return_sequence': dict(self.return_sequence),
-        }
-        save_json(payload, CHECKPOINT_FILE)
+    payload = {
+        'last_run_date': fmt_date(self.last_run_date),
+        'sequences': dict(self.sequences),
+        'customer_outstanding': {str(k): v for k, v in self.customer_outstanding.items()},
+        'last_purchase': {str(k): fmt_date(v) for k, v in self.last_purchase.items()},
+        'date_key_map': self.date_key_map,
+        'return_sequence': dict(self.return_sequence),
+    }
+    # Save locally (backup)
+    save_json(payload, CHECKPOINT_FILE)
+    # Save to Snowflake (primary)
+    if USE_SNOWFLAKE_STATE:
+        save_checkpoint(payload)
+      
 
     @classmethod
     def load(cls) -> 'Checkpoint':
@@ -169,7 +174,11 @@ class OpenInvoiceStore:
         return self._invoices.get(invoice_key)
 
     def save(self):
-        save_json(self.all(), OPEN_INVOICES_FILE)
+    # Save locally (backup)
+    save_json(self.all(), OPEN_INVOICES_FILE)
+    # Save to Snowflake (primary)
+    if USE_SNOWFLAKE_STATE:
+        save_open_invoices(self.all())
 
     @classmethod
     def load(cls) -> 'OpenInvoiceStore':
