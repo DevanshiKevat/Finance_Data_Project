@@ -906,3 +906,84 @@ resource "snowflake_table" "fact_returns" {
     type = "TIMESTAMP_NTZ"
   }
 }
+
+-- ----------------------------------------------------------------------------------------
+resource "snowflake_table" "pipeline_checkpoint" {
+  database = snowflake_database.analytics.name
+  schema   = snowflake_schema.raw.name
+  name     = "PIPELINE_CHECKPOINT"
+  column {
+    name = "checkpoint_key"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "checkpoint_value"
+    type = "VARIANT"
+  }
+  column {
+    name = "updated_at"
+    type = "TIMESTAMP_NTZ"
+  }
+}
+
+resource "snowflake_table" "open_invoices_state" {
+  database = snowflake_database.analytics.name
+  schema   = snowflake_schema.raw.name
+  name     = "OPEN_INVOICES_STATE"
+  column {
+    name = "invoice_key"
+    type = "NUMBER"
+  }
+  column {
+    name = "invoice_id"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "customer_key"
+    type = "NUMBER"
+  }
+  column {
+    name = "customer_type"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "invoice_date"
+    type = "DATE"
+  }
+  column {
+    name = "due_date"
+    type = "DATE"
+  }
+  column {
+    name = "original_amount"
+    type = "FLOAT"
+  }
+  column {
+    name = "paid_so_far"
+    type = "FLOAT"
+  }
+  column {
+    name = "remaining_balance"
+    type = "FLOAT"
+  }
+  column {
+    name = "payment_habit"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "store_key"
+    type = "NUMBER"
+  }
+  column {
+    name = "store_id"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "store_state"
+    type = "VARCHAR(16777216)"
+  }
+  column {
+    name = "updated_at"
+    type = "TIMESTAMP_NTZ"
+  }
+}
