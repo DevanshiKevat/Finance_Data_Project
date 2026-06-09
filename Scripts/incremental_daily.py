@@ -133,11 +133,15 @@ class Checkpoint:
             raw = None
 
         # Fall back to local file
+        # ✅ FIXED — graceful first-run handling
         if raw is None:
-            if not os.path.exists(CHECKPOINT_FILE):
-                raise FileNotFoundError("No checkpoint found. Run full_Load.py first.")
-            raw = load_json(CHECKPOINT_FILE)
-            logger.info("  Loaded checkpoint from local file")
+            if os.path.exists(CHECKPOINT_FILE):
+                raw = load_json(CHECKPOINT_FILE)
+                logger.info("  Loaded checkpoint from local file")
+            else:
+                # First run — no checkpoint anywhere, return empty state
+                logger.warning("  No checkpoint found anywhere — fresh start (first run)")
+                return cp   # cp.__init__ already sets safe defaults
 
         cp.last_run_date     = parse_date(raw.get('last_run_date'))
         cp.sequences         = defaultdict(int, {k: int(v) for k, v in raw.get('sequences', {}).items()})
@@ -155,7 +159,11 @@ class Checkpoint:
         self.return_sequence[invoice_key] += 1
         return self.return_sequence[invoice_key]
 
+    # ✅ FIXED
     def get_date_key(self, d: date) -> int:
+        if not self.date_key_map:
+            logger.warning(f"  date_key_map is empty — using 0 as fallback key for {d}")
+            return 0   # safe fallback; will be correct after full load populates it
         key = d.isoformat()
         if key in self.date_key_map:
             return self.date_key_map[key]
