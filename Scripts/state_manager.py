@@ -1,3 +1,8 @@
+"""
+State Manager - Saves/loads pipeline state to/from Snowflake
+Tables: PIPELINE_CHECKPOINT, OPEN_INVOICES_STATE (in RAW schema)
+"""
+
 import json
 import os
 from datetime import datetime
@@ -11,21 +16,24 @@ def get_conn():
         account=f"{org}-{account}".lower(),
         user=os.environ["SNOWFLAKE_USER"],
         password=os.environ["SNOWFLAKE_PASSWORD"],
-        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
-        database=os.environ.get("SNOWFLAKE_DATABASE", "ANALYTICS_DB"),
+        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "FINANCE_WH"),
+        database=os.environ.get("SNOWFLAKE_DATABASE", "FINANCE_DATA_DB"),
         schema="RAW",
     )
 
 
 def save_checkpoint(checkpoint_dict: dict):
-    """Save checkpoint.json contents to Snowflake"""
-    conn = get_conn()
+    """Upsert checkpoint into Snowflake PIPELINE_CHECKPOINT table"""
+    conn   = get_conn()
     cursor = conn.cursor()
-    now = datetime.utcnow()
-
+    now    = datetime.utcnow()
     cursor.execute("""
         MERGE INTO RAW.PIPELINE_CHECKPOINT AS target
-        USING (SELECT %s AS checkpoint_key, PARSE_JSON(%s) AS checkpoint_value, %s AS updated_at) AS source
+        USING (
+            SELECT %s AS checkpoint_key,
+                   PARSE_JSON(%s) AS checkpoint_value,
+                   %s AS updated_at
+        ) AS source
         ON target.checkpoint_key = source.checkpoint_key
         WHEN MATCHED THEN UPDATE SET
             target.checkpoint_value = source.checkpoint_value,
@@ -34,17 +42,15 @@ def save_checkpoint(checkpoint_dict: dict):
             (checkpoint_key, checkpoint_value, updated_at)
             VALUES (source.checkpoint_key, source.checkpoint_value, source.updated_at)
     """, ('main', json.dumps(checkpoint_dict), now))
-
     cursor.close()
     conn.close()
     print("✅ Checkpoint saved to Snowflake")
 
 
 def load_checkpoint() -> dict:
-    """Load checkpoint from Snowflake, return as dict"""
-    conn = get_conn()
+    """Load checkpoint dict from Snowflake"""
+    conn   = get_conn()
     cursor = conn.cursor()
-
     cursor.execute("""
         SELECT checkpoint_value
         FROM RAW.PIPELINE_CHECKPOINT
@@ -53,23 +59,19 @@ def load_checkpoint() -> dict:
     row = cursor.fetchone()
     cursor.close()
     conn.close()
-
     if not row:
         raise FileNotFoundError("No checkpoint found in Snowflake. Run full load first.")
-
     return json.loads(row[0])
 
 
 def save_open_invoices(invoices: list):
-    """Replace open invoices state in Snowflake"""
-    conn = get_conn()
+    """Replace all open invoices state in Snowflake"""
+    conn   = get_conn()
     cursor = conn.cursor()
-    now = datetime.utcnow()
+    now    = datetime.utcnow()
 
-    # Clear existing state
     cursor.execute("DELETE FROM RAW.OPEN_INVOICES_STATE")
 
-    # Insert all current open invoices
     if invoices:
         values = []
         for inv in invoices:
@@ -89,7 +91,6 @@ def save_open_invoices(invoices: list):
                 inv.get('store_state'),
                 now,
             ))
-
         cursor.executemany("""
             INSERT INTO RAW.OPEN_INVOICES_STATE (
                 invoice_key, invoice_id, customer_key, customer_type,
@@ -101,34 +102,29 @@ def save_open_invoices(invoices: list):
 
     cursor.close()
     conn.close()
-    print(f"✅ Open invoices state saved to Snowflake ({len(invoices)} records)")
+    print(f"✅ Open invoices saved to Snowflake ({len(invoices)} records)")
 
 
 def load_open_invoices() -> list:
-    """Load open invoices from Snowflake"""
-    conn = get_conn()
+    """Load all open invoices from Snowflake"""
+    conn   = get_conn()
     cursor = conn.cursor()
-
     cursor.execute("""
-        SELECT
-            invoice_key, invoice_id, customer_key, customer_type,
-            invoice_date, due_date, original_amount, paid_so_far,
-            remaining_balance, payment_habit, store_key, store_id, store_state
+        SELECT invoice_key, invoice_id, customer_key, customer_type,
+               invoice_date, due_date, original_amount, paid_so_far,
+               remaining_balance, payment_habit, store_key, store_id, store_state
         FROM RAW.OPEN_INVOICES_STATE
     """)
     rows = cursor.fetchall()
-    cols = [
-        'invoice_key', 'invoice_id', 'customer_key', 'customer_type',
-        'invoice_date', 'due_date', 'original_amount', 'paid_so_far',
-        'remaining_balance', 'payment_habit', 'store_key', 'store_id', 'store_state'
-    ]
+    cols = ['invoice_key','invoice_id','customer_key','customer_type',
+            'invoice_date','due_date','original_amount','paid_so_far',
+            'remaining_balance','payment_habit','store_key','store_id','store_state']
     cursor.close()
     conn.close()
 
     result = []
     for row in rows:
         rec = dict(zip(cols, row))
-        # Convert dates back to string format expected by incremental script
         for f in ('invoice_date', 'due_date'):
             if rec[f]:
                 rec[f] = str(rec[f])
