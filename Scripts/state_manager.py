@@ -28,7 +28,7 @@ def save_checkpoint(checkpoint_dict: dict):
     cursor = conn.cursor()
     now    = datetime.utcnow()
     cursor.execute("""
-        MERGE INTO RAW.PIPELINE_CHECKPOINT AS target
+        MERGE INTO FINANCE_DATA_DB.RAW.PIPELINE_CHECKPOINT AS target
         USING (
             SELECT %s AS checkpoint_key,
                    PARSE_JSON(%s) AS checkpoint_value,
@@ -80,7 +80,7 @@ def save_open_invoices(invoices: list):
     cursor = conn.cursor()
     now    = datetime.utcnow()
 
-    cursor.execute("DELETE FROM RAW.OPEN_INVOICES_STATE")
+    cursor.execute("DELETE FROM FINANCE_DATA_DB.RAW.OPEN_INVOICES_STATE")
 
     if invoices:
         values = []
@@ -102,7 +102,7 @@ def save_open_invoices(invoices: list):
                 now,
             ))
         cursor.executemany("""
-            INSERT INTO RAW.OPEN_INVOICES_STATE (
+            INSERT INTO FINANCE_DATA_DB.RAW.OPEN_INVOICES_STATE (
                 invoice_key, invoice_id, customer_key, customer_type,
                 invoice_date, due_date, original_amount, paid_so_far,
                 remaining_balance, payment_habit, store_key, store_id,
