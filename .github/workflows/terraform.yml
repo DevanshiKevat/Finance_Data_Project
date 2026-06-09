@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: terraform-snowflake
-  cancel-in-progress: true        # ← cancels older run automatically
+  cancel-in-progress: true
 
 jobs:
   terraform:
