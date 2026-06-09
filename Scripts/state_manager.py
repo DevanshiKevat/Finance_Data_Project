@@ -8,7 +8,6 @@ import os
 from datetime import datetime
 import snowflake.connector
 
-# ── Single source of truth for table names ──────────────────────────
 _DB     = "FINANCE_DATA_DB"
 _SCHEMA = "RAW"
 CHECKPOINT_TABLE    = f"{_DB}.{_SCHEMA}.PIPELINE_CHECKPOINT"
@@ -29,26 +28,28 @@ def get_conn():
 
 
 def save_checkpoint(checkpoint_dict: dict):
-    """Upsert checkpoint into Snowflake PIPELINE_CHECKPOINT table."""
+    """Upsert checkpoint — UPDATE first, INSERT if no row exists."""
     conn   = get_conn()
     cursor = conn.cursor()
     now    = datetime.utcnow()
+    json_str = json.dumps(checkpoint_dict)
     try:
+        # Try UPDATE first
         cursor.execute(f"""
-            MERGE INTO {CHECKPOINT_TABLE} AS target
-            USING (
-                SELECT %s         AS checkpoint_key,
-                       PARSE_JSON(%s) AS checkpoint_value,
-                       %s         AS updated_at
-            ) AS source
-            ON target.checkpoint_key = source.checkpoint_key
-            WHEN MATCHED THEN UPDATE SET
-                target.checkpoint_value = source.checkpoint_value,
-                target.updated_at       = source.updated_at
-            WHEN NOT MATCHED THEN INSERT
-                (checkpoint_key, checkpoint_value, updated_at)
-                VALUES (source.checkpoint_key, source.checkpoint_value, source.updated_at)
-        """, ('main', json.dumps(checkpoint_dict), now))
+            UPDATE {CHECKPOINT_TABLE}
+            SET    CHECKPOINT_VALUE = PARSE_JSON(%s),
+                   UPDATED_AT       = %s
+            WHERE  CHECKPOINT_KEY = 'main'
+        """, (json_str, now))
+
+        # If no rows matched, INSERT
+        if cursor.rowcount == 0:
+            cursor.execute(f"""
+                INSERT INTO {CHECKPOINT_TABLE}
+                    (CHECKPOINT_KEY, CHECKPOINT_VALUE, UPDATED_AT)
+                VALUES ('main', PARSE_JSON(%s), %s)
+            """, (json_str, now))
+
         print("✅ Checkpoint saved to Snowflake")
     except Exception as e:
         print(f"❌ save_checkpoint failed: {e}")
@@ -60,16 +61,16 @@ def save_checkpoint(checkpoint_dict: dict):
 
 def load_checkpoint() -> dict | None:
     """
-    Load checkpoint dict from Snowflake.
+    Load checkpoint from Snowflake.
     Returns None on first run (empty table) — caller handles gracefully.
     """
     conn   = get_conn()
     cursor = conn.cursor()
     try:
         cursor.execute(f"""
-            SELECT checkpoint_value
-            FROM {CHECKPOINT_TABLE}
-            WHERE checkpoint_key = 'main'
+            SELECT CHECKPOINT_VALUE
+            FROM   {CHECKPOINT_TABLE}
+            WHERE  CHECKPOINT_KEY = 'main'
         """)
         row = cursor.fetchone()
     except Exception as e:
@@ -80,7 +81,7 @@ def load_checkpoint() -> dict | None:
         conn.close()
 
     if not row or row[0] is None:
-        print("ℹ️  No checkpoint found — first run detected. Starting from scratch.")
+        print("ℹ️  No checkpoint found — first run detected.")
         return None
 
     return json.loads(row[0])
@@ -116,10 +117,10 @@ def save_open_invoices(invoices: list):
             ]
             cursor.executemany(f"""
                 INSERT INTO {OPEN_INVOICES_TABLE} (
-                    invoice_key, invoice_id, customer_key, customer_type,
-                    invoice_date, due_date, original_amount, paid_so_far,
-                    remaining_balance, payment_habit, store_key, store_id,
-                    store_state, updated_at
+                    INVOICE_KEY, INVOICE_ID, CUSTOMER_KEY, CUSTOMER_TYPE,
+                    INVOICE_DATE, DUE_DATE, ORIGINAL_AMOUNT, PAID_SO_FAR,
+                    REMAINING_BALANCE, PAYMENT_HABIT, STORE_KEY, STORE_ID,
+                    STORE_STATE, UPDATED_AT
                 ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, values)
 
@@ -138,10 +139,11 @@ def load_open_invoices() -> list:
     cursor = conn.cursor()
     try:
         cursor.execute(f"""
-            SELECT invoice_key, invoice_id, customer_key, customer_type,
-                   invoice_date, due_date, original_amount, paid_so_far,
-                   remaining_balance, payment_habit, store_key, store_id, store_state
-            FROM {OPEN_INVOICES_TABLE}
+            SELECT INVOICE_KEY, INVOICE_ID, CUSTOMER_KEY, CUSTOMER_TYPE,
+                   INVOICE_DATE, DUE_DATE, ORIGINAL_AMOUNT, PAID_SO_FAR,
+                   REMAINING_BALANCE, PAYMENT_HABIT, STORE_KEY, STORE_ID,
+                   STORE_STATE
+            FROM   {OPEN_INVOICES_TABLE}
         """)
         rows = cursor.fetchall()
     except Exception as e:
