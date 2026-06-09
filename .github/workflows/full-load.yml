@@ -23,7 +23,7 @@ jobs:
 
       - name: Upload to Snowflake
         env:
-          SNOWFLAKE_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}  
+          SNOWFLAKE_ORGANIZATION: ${{ secrets.SNOWFLAKE_ORGANIZATION }}
           SNOWFLAKE_ACCOUNT:      ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER:         ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD:     ${{ secrets.SNOWFLAKE_PASSWORD }}
@@ -32,11 +32,5 @@ jobs:
           OUTPUT_PATH:            ./data
         run: python Scripts/upload_to_snowflake.py --mode full
 
-      - name: Persist state files as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pipeline-state
-          path: |
-            data/state/checkpoint.json
-            data/state/open_invoices.json
-          retention-days: 90
+      # State is saved inside Snowflake by full_Load.py via state_manager.py
+      # No GitHub artifact needed — Snowflake IS the state store
