@@ -909,7 +909,7 @@ resource "snowflake_table" "fact_returns" {
 
 -- ----------------------------------------------------------------------------------------
 resource "snowflake_table" "pipeline_checkpoint" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.finance.name
   schema   = snowflake_schema.raw.name
   name     = "PIPELINE_CHECKPOINT"
   column {
@@ -927,7 +927,7 @@ resource "snowflake_table" "pipeline_checkpoint" {
 }
 
 resource "snowflake_table" "open_invoices_state" {
-  database = snowflake_database.analytics.name
+  database = snowflake_database.finance.name
   schema   = snowflake_schema.raw.name
   name     = "OPEN_INVOICES_STATE"
   column {
