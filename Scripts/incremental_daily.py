@@ -853,7 +853,7 @@ class BackfillRunner:
 # ============================================================================
 
 def load_dimensions(full_load_dir: str = FULL_LOAD_DIR) -> Dict:
-    tables = ['DIM_CUSTOMERS','DIM_PRODUCTS','DIM_STORE','DIM_USER',
+    tables = ['DIM_CUSTOMERS','DIM_PRODUCTS','DIM_STORE','DIM_EMPLOYEE',
               'DIM_LOCATION','CREDIT_POLICY','CUSTOMER_CREDIT_MAPPING']
     result = {}
     for t in tables:
