@@ -906,8 +906,7 @@ resource "snowflake_table" "fact_returns" {
     type = "TIMESTAMP_NTZ"
   }
 }
-
--- ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 resource "snowflake_table" "pipeline_checkpoint" {
   database = snowflake_database.finance.name
   schema   = snowflake_schema.raw.name
