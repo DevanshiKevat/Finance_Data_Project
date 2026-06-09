@@ -47,22 +47,32 @@ def save_checkpoint(checkpoint_dict: dict):
     print("✅ Checkpoint saved to Snowflake")
 
 
-def load_checkpoint() -> dict:
-    """Load checkpoint dict from Snowflake"""
+def load_checkpoint() -> dict | None:
+    """
+    Load checkpoint dict from Snowflake.
+    Returns None on first run (empty table) so caller can handle gracefully.
+    """
     conn   = get_conn()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT checkpoint_value
-        FROM RAW.PIPELINE_CHECKPOINT
-        WHERE checkpoint_key = 'main'
-    """)
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    if not row:
-        raise FileNotFoundError("No checkpoint found in Snowflake. Run full load first.")
-    return json.loads(row[0])
+    try:
+        cursor.execute("""
+            SELECT checkpoint_value
+            FROM FINANCE_DATA_DB.RAW.PIPELINE_CHECKPOINT
+            WHERE checkpoint_key = 'main'
+        """)
+        row = cursor.fetchone()
+    except Exception as e:
+        print(f"⚠️  Snowflake checkpoint query failed: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()
 
+    if not row or row[0] is None:
+        print("ℹ️  No checkpoint found — first run detected. Starting from scratch.")
+        return None                    # ← caller decides what to do
+
+    return json.loads(row[0])
 
 def save_open_invoices(invoices: list):
     """Replace all open invoices state in Snowflake"""
