@@ -1,8 +1,9 @@
 """
 ================================================================================
-Financial Data Warehouse - INCREMENTAL DAILY GENERATOR v2.2
+Financial Data Warehouse - INCREMENTAL DAILY GENERATOR v2.3
 Compatible with full_Load.py v6.0
 State stored in Snowflake (PIPELINE_CHECKPOINT + OPEN_INVOICES_STATE)
+Schema aligned with Terraform main.tf definitions.
 ================================================================================
 """
 
@@ -33,17 +34,26 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # PATHS
 # ============================================================================
-BASE_PATH         = os.getenv('OUTPUT_PATH', './data')
-STATE_DIR         = os.path.join(BASE_PATH, 'state')
-FULL_LOAD_DIR     = os.path.join(BASE_PATH, 'full_load')
-INCREMENTAL_DIR   = os.path.join(BASE_PATH, 'incremental')
-CHECKPOINT_FILE   = os.path.join(STATE_DIR, 'checkpoint.json')
+BASE_PATH          = os.getenv('OUTPUT_PATH', './data')
+STATE_DIR          = os.path.join(BASE_PATH, 'state')
+FULL_LOAD_DIR      = os.path.join(BASE_PATH, 'full_load')
+INCREMENTAL_DIR    = os.path.join(BASE_PATH, 'incremental')
+CHECKPOINT_FILE    = os.path.join(STATE_DIR, 'checkpoint.json')
 OPEN_INVOICES_FILE = os.path.join(STATE_DIR, 'open_invoices.json')
 
 PAYMENT_MODES = {
     'B2B': ['NEFT', 'RTGS', 'IMPS', 'Cheque', 'Bank Transfer'],
     'B2D': ['NEFT', 'IMPS', 'Cash', 'UPI', 'Bank Transfer'],
     'B2C': ['Cash', 'UPI', 'Card', 'Wallet', 'Net Banking'],
+}
+
+# Maps return reason → (category, detail) matching Terraform FACT_RETURNS schema
+RETURN_REASONS = {
+    'Damaged':          ('Product Defect',          'Damaged in Transit'),
+    'Wrong Item':       ('Fulfillment Error',        'Wrong Item Delivered'),
+    'Quality Issue':    ('Product Defect',           'Quality Not as Expected'),
+    'Expired':          ('Product Defect',           'Product Expired'),
+    'Customer Request': ('Customer Change of Mind',  'Customer Request'),
 }
 
 
@@ -102,7 +112,6 @@ class Checkpoint:
         self.return_sequence: Dict[int, int] = defaultdict(int)
 
     def save(self):
-        # ── FIX: payload is now correctly indented inside save() ──
         payload = {
             'last_run_date': fmt_date(self.last_run_date),
             'sequences': dict(self.sequences),
@@ -111,9 +120,7 @@ class Checkpoint:
             'date_key_map': self.date_key_map,
             'return_sequence': dict(self.return_sequence),
         }
-        # Save locally as backup
         save_json(payload, CHECKPOINT_FILE)
-        # Save to Snowflake as primary state
         if USE_SNOWFLAKE_STATE:
             save_checkpoint(payload)
 
@@ -121,34 +128,33 @@ class Checkpoint:
     def load(cls) -> 'Checkpoint':
         cp = cls()
 
-        # Try Snowflake state first
         if USE_SNOWFLAKE_STATE:
             try:
                 raw = load_checkpoint()
-                logger.info("  Loaded checkpoint from Snowflake")
+                if raw is not None:
+                    logger.info("  Loaded checkpoint from Snowflake")
+                else:
+                    raw = None
             except Exception as e:
                 logger.warning(f"  Snowflake checkpoint load failed: {e}. Trying local file...")
                 raw = None
         else:
             raw = None
 
-        # Fall back to local file
-        # ✅ FIXED — graceful first-run handling
         if raw is None:
             if os.path.exists(CHECKPOINT_FILE):
                 raw = load_json(CHECKPOINT_FILE)
                 logger.info("  Loaded checkpoint from local file")
             else:
-                # First run — no checkpoint anywhere, return empty state
                 logger.warning("  No checkpoint found anywhere — fresh start (first run)")
-                return cp   # cp.__init__ already sets safe defaults
+                return cp   # return with safe defaults
 
-        cp.last_run_date     = parse_date(raw.get('last_run_date'))
-        cp.sequences         = defaultdict(int, {k: int(v) for k, v in raw.get('sequences', {}).items()})
+        cp.last_run_date        = parse_date(raw.get('last_run_date'))
+        cp.sequences            = defaultdict(int, {k: int(v) for k, v in raw.get('sequences', {}).items()})
         cp.customer_outstanding = defaultdict(float, {int(k): float(v) for k, v in raw.get('customer_outstanding', {}).items()})
-        cp.last_purchase     = {int(k): date.fromisoformat(v) for k, v in raw.get('last_purchase', {}).items() if v}
-        cp.date_key_map      = {k: int(v) for k, v in raw.get('date_key_map', {}).items()}
-        cp.return_sequence   = defaultdict(int, {int(k): int(v) for k, v in raw.get('return_sequence', {}).items()})
+        cp.last_purchase        = {int(k): date.fromisoformat(v) for k, v in raw.get('last_purchase', {}).items() if v}
+        cp.date_key_map         = {k: int(v) for k, v in raw.get('date_key_map', {}).items()}
+        cp.return_sequence      = defaultdict(int, {int(k): int(v) for k, v in raw.get('return_sequence', {}).items()})
         return cp
 
     def next_seq(self, name: str) -> int:
@@ -159,11 +165,10 @@ class Checkpoint:
         self.return_sequence[invoice_key] += 1
         return self.return_sequence[invoice_key]
 
-    # ✅ FIXED
     def get_date_key(self, d: date) -> int:
         if not self.date_key_map:
-            logger.warning(f"  date_key_map is empty — using 0 as fallback key for {d}")
-            return 0   # safe fallback; will be correct after full load populates it
+            logger.warning(f"  date_key_map empty — using 0 as fallback for {d}")
+            return 0
         key = d.isoformat()
         if key in self.date_key_map:
             return self.date_key_map[key]
@@ -197,9 +202,7 @@ class OpenInvoiceStore:
         return self._invoices.get(invoice_key)
 
     def save(self):
-        # Save locally as backup
         save_json(self.all(), OPEN_INVOICES_FILE)
-        # Save to Snowflake as primary state
         if USE_SNOWFLAKE_STATE:
             save_open_invoices(self.all())
 
@@ -207,7 +210,6 @@ class OpenInvoiceStore:
     def load(cls) -> 'OpenInvoiceStore':
         store = cls()
 
-        # Try Snowflake first
         if USE_SNOWFLAKE_STATE:
             try:
                 invoices = load_open_invoices()
@@ -218,7 +220,6 @@ class OpenInvoiceStore:
             except Exception as e:
                 logger.warning(f"  Snowflake open invoices load failed: {e}. Trying local file...")
 
-        # Fall back to local file
         if os.path.exists(OPEN_INVOICES_FILE):
             for rec in load_json(OPEN_INVOICES_FILE):
                 store._invoices[rec['invoice_key']] = rec
@@ -372,12 +373,12 @@ class DailyRunner:
             ckey = int(c['customer_key'])
             bcat = c.get('business_category')
             self.cust_behavior[ckey] = {
-                'payment_habit':     c.get('payment_habit', 'on_time'),
-                'bulk_preference':   c.get('bulk_preference', 'medium'),
-                'loyalty_tier':      c.get('loyalty_tier', 'regular'),
-                'business_category': bcat,
+                'payment_habit':      c.get('payment_habit', 'on_time'),
+                'bulk_preference':    c.get('bulk_preference', 'medium'),
+                'loyalty_tier':       c.get('loyalty_tier', 'regular'),
+                'business_category':  bcat,
                 'allowed_categories': CATEGORY_MAPPING.get(bcat) if bcat else None,
-                'customer_type':     c.get('customer_type'),
+                'customer_type':      c.get('customer_type'),
             }
 
         self.by_type: Dict[str, List[Dict]] = defaultdict(list)
@@ -404,14 +405,14 @@ class DailyRunner:
         logger.info(f"  Open invoices: {len(self.store.all()):,}")
         logger.info("=" * 60)
 
-        new_invoices  = []
-        new_line_items = []
+        new_invoices     = []
+        new_line_items   = []
         updated_invoices = []
-        pay_b2b_b2d   = []
-        pay_b2c       = []
-        returns       = []
+        pay_b2b_b2d      = []
+        pay_b2c          = []
+        returns          = []
 
-        # Step 1: Settle old invoices & generate returns
+        # ── Step 1: Settle old invoices & generate returns ──────────
         logger.info("Step 1: Settling open invoices & processing returns...")
         settled_keys = []
 
@@ -425,30 +426,31 @@ class DailyRunner:
                 pkey     = self.cp.next_seq('payment')
                 date_key = self.cp.get_date_key(today)
 
+                # ── Base payment record (fields shared between B2B and B2C) ──
+                # Columns removed vs v2.2: bank_account_number, refund_amount, refund_date_key
                 pay_rec = {
-                    'payment_key':            pkey,
-                    'payment_id':             f"PAY_{pkey:010d}",
-                    'invoice_key':            inv['invoice_key'],
-                    'customer_key':           ckey,
-                    'payment_date':           fmt_date(today),
-                    'payment_date_key':       date_key,
-                    'payment_amount':         pay_amount,
-                    'payment_mode':           random.choice(PAYMENT_MODES.get(ctype, ['NEFT'])),
-                    'bank_reference_number':  f"UTR{random.randint(100000000, 999999999)}",
-                    'bank_account_number':    f"ACC{random.randint(10000000000, 99999999999)}",
-                    'settlement_status':      'Settled',
-                    'channel_type':           ctype,
-                    'is_refund':              False,
-                    'refund_amount':          0.0,
-                    'refund_date_key':        None,
-                    'remarks':                f"Payment for invoice {inv['invoice_id']}",
+                    'payment_key':           pkey,
+                    'payment_id':            f"PAY_{pkey:010d}",
+                    'invoice_key':           inv['invoice_key'],
+                    'customer_key':          ckey,
+                    'payment_date':          fmt_date(today),
+                    'payment_date_key':      date_key,
+                    'payment_amount':        pay_amount,
+                    'payment_mode':          random.choice(PAYMENT_MODES.get(ctype, ['NEFT'])),
+                    'bank_reference_number': f"UTR{random.randint(100000000, 999999999)}",
+                    'settlement_status':     'Settled',
+                    'channel_type':          ctype,
+                    'is_refund':             False,
+                    'remarks':               f"Payment for invoice {inv['invoice_id']}",
                 }
 
                 if ctype in ('B2B', 'B2D'):
+                    # FACT_PAYMENT_B2B_B2D: last column is enterprise_payment_key
                     pay_rec['enterprise_payment_key'] = pkey
                     pay_b2b_b2d.append(pay_rec)
                     self.cp.customer_outstanding[ckey] = max(0.0, self.cp.customer_outstanding[ckey] - pay_amount)
                 else:
+                    # FACT_PAYMENT_B2C: last columns are retail_payment_key, store_key, store_id
                     pay_rec['retail_payment_key'] = pkey
                     pay_rec['store_key']          = inv.get('store_key')
                     pay_rec['store_id']           = inv.get('store_id')
@@ -470,32 +472,63 @@ class DailyRunner:
                     'updated_date':   fmt_date(today),
                 })
 
-            # Process returns
-            inv_date          = parse_date(inv['invoice_date'])
+            # ── Returns ─────────────────────────────────────────────
+            inv_date           = parse_date(inv['invoice_date'])
             days_since_invoice = (today - inv_date).days
-            paid_so_far       = inv['paid_so_far']
+            paid_so_far        = inv['paid_so_far']
 
             if ReturnSimulator.should_return(inv['original_amount'], inv['customer_type'], days_since_invoice):
                 return_amount = ReturnSimulator.calculate_return_amount(inv['original_amount'], paid_so_far)
                 if return_amount > 0:
                     return_key = self.cp.next_seq('return')
                     date_key   = self.cp.get_date_key(today)
+
+                    # ── Map reason to Terraform schema ───────────────
+                    reason_raw                    = random.choice(list(RETURN_REASONS.keys()))
+                    reason_category, reason_detail = RETURN_REASONS[reason_raw]
+
+                    # Restocking fee (B2B/B2D only)
+                    restocking_pct = round(random.uniform(0, 10), 2) if inv['customer_type'] in ('B2B', 'B2D') else 0.0
+                    restocking_amt = round(return_amount * restocking_pct / 100, 2)
+                    net_refund     = round(return_amount - restocking_amt, 2)
+
+                    # Approximate tax split at 18% GST
+                    gst_rate        = 0.18
+                    refund_excl_tax = round(return_amount / (1 + gst_rate), 2)
+                    refund_tax_amt  = round(return_amount - refund_excl_tax, 2)
+
+                    refund_type = random.choice(['Credit Note', 'Bank Transfer', 'Original Payment Method'])
+
+                    # ── FACT_RETURNS — aligned with Terraform schema ──
                     returns.append({
-                        'return_key':    return_key,
-                        'return_id':     f"RET_{return_key:010d}",
-                        'invoice_key':   inv['invoice_key'],
-                        'customer_key':  inv['customer_key'],
-                        'return_date':   fmt_date(today),
-                        'return_date_key': date_key,
-                        'return_amount': return_amount,
-                        'return_reason': random.choice(['Damaged', 'Wrong Item', 'Quality Issue', 'Expired', 'Customer Request']),
-                        'return_status': 'Approved',
-                        'refund_processed': return_amount <= paid_so_far,
-                        'channel_type':  inv['customer_type'],
-                        'store_key':     inv.get('store_key'),
-                        'store_id':      inv.get('store_id'),
-                        'remarks':       f"Return for invoice {inv['invoice_id']}",
+                        'return_key':             return_key,
+                        'return_id':              f"RET_{return_key:010d}",
+                        'invoice_key':            inv['invoice_key'],
+                        'invoice_id':             inv['invoice_id'],
+                        'customer_key':           inv['customer_key'],
+                        'product_key':            None,            # invoice-level return; no single product
+                        'return_quantity':         None,
+                        'original_quantity':       None,
+                        'refund_amount':           refund_excl_tax,
+                        'refund_tax_amount':       refund_tax_amt,
+                        'total_refund_amount':     return_amount,
+                        'return_date_key':         date_key,
+                        'return_date':             fmt_date(today),
+                        'refund_date_key':         date_key,
+                        'refund_date':             fmt_date(today),
+                        'return_reason_category':  reason_category,
+                        'return_reason_detail':    reason_detail,
+                        'return_channel':          inv['customer_type'],
+                        'refund_type':             refund_type,
+                        'restocking_fee_percent':  restocking_pct,
+                        'restocking_fee_amount':   restocking_amt,
+                        'net_refund_amount':        net_refund,
+                        'approved_by_user_key':    None,
+                        'approved_by_name':        None,
+                        'status':                  'Approved',
+                        'created_at':              str(datetime.utcnow()),
                     })
+
                     if inv['customer_type'] in ('B2B', 'B2D'):
                         self.cp.customer_outstanding[int(inv['customer_key'])] = max(
                             0.0, self.cp.customer_outstanding[int(inv['customer_key'])] - return_amount)
@@ -508,22 +541,22 @@ class DailyRunner:
         logger.info(f"  Returns:  {len(returns):,}")
         logger.info(f"  Remaining open: {len(self.store.all()):,}")
 
-        # Step 2: Generate new invoices
+        # ── Step 2: Generate new invoices ────────────────────────────
         logger.info("Step 2: Generating today's new invoices...")
         new_invoices, new_line_items, new_pays_b2b, new_pays_b2c = self._gen_todays_invoices(today)
         pay_b2b_b2d.extend(new_pays_b2b)
         pay_b2c.extend(new_pays_b2c)
 
-        # Step 3: Save CSVs
+        # ── Step 3: Save CSVs ────────────────────────────────────────
         out_dir = os.path.join(INCREMENTAL_DIR, today.strftime('%Y%m%d'))
-        save_csv(new_invoices,    os.path.join(out_dir, 'FACT_INVOICE_HEADER_new.csv'))
-        save_csv(new_line_items,  os.path.join(out_dir, 'FACT_INVOICE_LINE_ITEM_new.csv'))
+        save_csv(new_invoices,     os.path.join(out_dir, 'FACT_INVOICE_HEADER_new.csv'))
+        save_csv(new_line_items,   os.path.join(out_dir, 'FACT_INVOICE_LINE_ITEM_new.csv'))
         save_csv(updated_invoices, os.path.join(out_dir, 'FACT_INVOICE_HEADER_updates.csv'))
-        save_csv(pay_b2b_b2d,     os.path.join(out_dir, 'FACT_PAYMENT_B2B_B2D_new.csv'))
-        save_csv(pay_b2c,         os.path.join(out_dir, 'FACT_PAYMENT_B2C_new.csv'))
-        save_csv(returns,         os.path.join(out_dir, 'FACT_RETURNS_new.csv'))
+        save_csv(pay_b2b_b2d,      os.path.join(out_dir, 'FACT_PAYMENT_B2B_B2D_new.csv'))
+        save_csv(pay_b2c,          os.path.join(out_dir, 'FACT_PAYMENT_B2C_new.csv'))
+        save_csv(returns,          os.path.join(out_dir, 'FACT_RETURNS_new.csv'))
 
-        # Step 4: Update state (Snowflake + local backup)
+        # ── Step 4: Update state ─────────────────────────────────────
         self.cp.last_run_date = today
         self.cp.save()
         self.store.save()
@@ -538,20 +571,20 @@ class DailyRunner:
         logger.info("=" * 60)
 
     def _gen_todays_invoices(self, today: date):
-        new_invoices    = []
-        new_line_items  = []
-        pays_b2b        = []
-        pays_b2c        = []
+        new_invoices   = []
+        new_line_items = []
+        pays_b2b       = []
+        pays_b2c       = []
 
         NATIONAL_HOLIDAYS = {'01-26', '08-15', '10-02', '01-01', '12-25'}
-        is_sunday   = today.weekday() == 6
-        is_holiday  = today.strftime('%m-%d') in NATIONAL_HOLIDAYS
+        is_sunday  = today.weekday() == 6
+        is_holiday = today.strftime('%m-%d') in NATIONAL_HOLIDAYS
 
         INVOICES_DAILY = {'B2B': (8, 20), 'B2D': (10, 25), 'B2C': (80, 200)}
         BULK_QTY = {
-            'B2B': {'small': [10, 25], 'medium': [25, 50], 'large': [50, 100], 'extreme': [100, 250]},
-            'B2D': {'small': [5, 10],  'medium': [10, 20], 'large': [20, 50],  'extreme': [50, 100]},
-            'B2C': {'small': [1],      'medium': [1, 2],   'large': [2, 3],    'extreme': [3, 5]},
+            'B2B': {'small': [10, 25], 'medium': [25, 50],  'large': [50, 100],  'extreme': [100, 250]},
+            'B2D': {'small': [5, 10],  'medium': [10, 20],  'large': [20, 50],   'extreme': [50, 100]},
+            'B2C': {'small': [1],      'medium': [1, 2],    'large': [2, 3],     'extreme': [3, 5]},
         }
         MIN_INV = {'B2B': 5000, 'B2D': 25000, 'B2C': 50}
 
@@ -603,13 +636,13 @@ class DailyRunner:
                 cust_state    = c.get('state', 'Gujarat')
                 is_interstate = cust_state != store_state
 
-                emp_pool  = self.employees_by_loc.get(store_loc_key, self.employees)
-                employee  = random.choice(emp_pool) if emp_pool else {'user_key': 1}
+                emp_pool = self.employees_by_loc.get(store_loc_key, self.employees)
+                employee = random.choice(emp_pool) if emp_pool else {'user_key': 1}
 
                 credit_days = 0
                 if ctype in ('B2B', 'B2D') and policy:
                     credit_days = int(policy.get('credit_days_limit', 30))
-                    if loy == 'vip':      credit_days += 15
+                    if loy == 'vip':       credit_days += 15
                     elif loy == 'premium': credit_days += 7
                 due_date = today + timedelta(days=credit_days)
 
@@ -626,7 +659,7 @@ class DailyRunner:
 
                 n_items = (
                     random.randint(3, 10) if (ctype == 'B2B' and bulk in ('large', 'extreme'))
-                    else random.randint(2, 7) if ctype == 'B2B'
+                    else random.randint(2, 7)  if ctype == 'B2B'
                     else random.randint(4, 12) if (ctype == 'B2D' and bulk in ('large', 'extreme'))
                     else random.randint(3, 8)  if ctype == 'B2D'
                     else random.randint(1, 4)
@@ -634,6 +667,8 @@ class DailyRunner:
                 n_items   = min(n_items, len(prod_pool))
                 sel_prods = random.sample(prod_pool, n_items) if n_items > 0 else []
 
+                # ── FACT_INVOICE_HEADER — aligned with Terraform column order ──
+                # Added: payment_habit | Moved: store_state before user_key
                 invoice = {
                     'invoice_key':                   inv_key,
                     'invoice_id':                    inv_number,
@@ -643,6 +678,7 @@ class DailyRunner:
                     'invoice_date_key':              inv_date_key,
                     'due_date':                      fmt_date(due_date),
                     'due_date_key':                  due_date_key,
+                    'payment_habit':                 beh.get('payment_habit', 'on_time'),  # ← ADDED
                     'total_taxable_amount':          0.0,
                     'total_cgst_amount':             0.0,
                     'total_sgst_amount':             0.0,
@@ -657,10 +693,10 @@ class DailyRunner:
                     'payment_status':                'Unpaid',
                     'customer_gst_number':           c.get('gst_no'),
                     'location_key':                  store_loc_key,
+                    'store_state':                   store_state,          # ← MOVED before user_key
                     'user_key':                      int(employee.get('user_key', 1)),
                     'store_key':                     store_key,
                     'is_interstate':                 is_interstate,
-                    'store_state':                   store_state,
                 }
 
                 total_gross = 0.0
@@ -668,9 +704,9 @@ class DailyRunner:
                 line_items_for_invoice = []
 
                 for prod in sel_prods:
-                    prod_key  = int(prod['product_key'])
-                    qty_opts  = BULK_QTY.get(ctype, {}).get(bulk, [1, 2])
-                    qty       = random.choice(qty_opts)
+                    prod_key   = int(prod['product_key'])
+                    qty_opts   = BULK_QTY.get(ctype, {}).get(bulk, [1, 2])
+                    qty        = random.choice(qty_opts)
                     unit_price = float(prod.get('selling_price', 100))
                     gross_line = round(qty * unit_price, 2)
 
@@ -707,24 +743,29 @@ class DailyRunner:
                     line_tot = taxable_line + tax_a
 
                     line_item_key_counter += 1
+
+                    # ── FACT_INVOICE_LINE_ITEM — aligned with Terraform column order ──
+                    # Renamed: invoice_line_key, unit_price_excl_gst, gross_line_amount,
+                    #          discount_percent, line_total_incl_gst
+                    # Reordered: all *_percent cols before all *_amount cols
                     line_items_for_invoice.append({
-                        'line_item_key':     line_item_key_counter,
-                        'invoice_key':       inv_key,
-                        'product_key':       prod_key,
-                        'quantity':          qty,
-                        'unit_price':        unit_price,
-                        'gross_amount':      gross_line,
-                        'discount_percentage': round(disc_pct, 2),
-                        'discount_amount':   disc_amt,
-                        'taxable_amount':    taxable_line,
-                        'cgst_percent':      cgst_p if not is_interstate else 0,
-                        'cgst_amount':       cgst_a,
-                        'sgst_percent':      sgst_p if not is_interstate else 0,
-                        'sgst_amount':       sgst_a,
-                        'igst_percent':      igst_p if is_interstate else 0,
-                        'igst_amount':       igst_a,
-                        'total_tax_amount':  tax_a,
-                        'line_total_amount': round(line_tot, 2),
+                        'invoice_line_key':   line_item_key_counter,   # was: line_item_key
+                        'invoice_key':        inv_key,
+                        'product_key':        prod_key,
+                        'quantity':           qty,
+                        'unit_price_excl_gst': unit_price,             # was: unit_price
+                        'gross_line_amount':  gross_line,              # was: gross_amount
+                        'discount_percent':   round(disc_pct, 2),      # was: discount_percentage
+                        'discount_amount':    disc_amt,
+                        'taxable_amount':     taxable_line,
+                        'cgst_percent':       cgst_p if not is_interstate else 0,
+                        'sgst_percent':       sgst_p if not is_interstate else 0,   # ← percents grouped
+                        'igst_percent':       igst_p if is_interstate else 0,
+                        'cgst_amount':        cgst_a,
+                        'sgst_amount':        sgst_a,                  # ← amounts grouped
+                        'igst_amount':        igst_a,
+                        'total_tax_amount':   tax_a,
+                        'line_total_incl_gst': round(line_tot, 2),     # was: line_total_amount
                     })
 
                     total_gross += gross_line
@@ -751,10 +792,11 @@ class DailyRunner:
                                   'total_igst_amount','total_tax_amount','total_invoice_amount_incl_gst',
                                   'total_gross_amount','total_discount_amount'):
                         invoice[field] = round(invoice[field] * sf, 2)
+                    # Updated field names to match renamed columns
                     for li in line_items_for_invoice:
-                        for field in ['gross_amount','discount_amount','taxable_amount',
+                        for field in ['gross_line_amount','discount_amount','taxable_amount',
                                       'cgst_amount','sgst_amount','igst_amount',
-                                      'total_tax_amount','line_total_amount']:
+                                      'total_tax_amount','line_total_incl_gst']:
                             li[field] = round(li[field] * sf, 2)
 
                 inv_total = invoice['total_invoice_amount_incl_gst']
@@ -765,6 +807,9 @@ class DailyRunner:
                     invoice['net_payment']    = inv_total
                     pkey     = self.cp.next_seq('payment')
                     date_key = self.cp.get_date_key(today)
+
+                    # ── FACT_PAYMENT_B2C — aligned with Terraform ──
+                    # Removed: bank_account_number, refund_amount, refund_date_key
                     pays_b2c.append({
                         'payment_key':           pkey,
                         'payment_id':            f"PAY_{pkey:010d}",
@@ -775,12 +820,9 @@ class DailyRunner:
                         'payment_amount':        round(inv_total, 2),
                         'payment_mode':          random.choice(PAYMENT_MODES['B2C']),
                         'bank_reference_number': f"UTR{random.randint(100000000, 999999999)}",
-                        'bank_account_number':   f"ACC{random.randint(10000000000, 99999999999)}",
                         'settlement_status':     'Settled',
                         'channel_type':          'B2C',
                         'is_refund':             False,
-                        'refund_amount':         0.0,
-                        'refund_date_key':       None,
                         'remarks':               None,
                         'retail_payment_key':    pkey,
                         'store_key':             store_key,
@@ -853,7 +895,9 @@ class BackfillRunner:
 # ============================================================================
 
 def load_dimensions(full_load_dir: str = FULL_LOAD_DIR) -> Dict:
-    tables = ['DIM_CUSTOMERS','DIM_PRODUCTS','DIM_STORE','DIM_EMPLOYEE',
+    # DIM_USER.csv is the file generated by full_Load.py;
+    # upload_to_snowflake.py maps it to the DIM_EMPLOYEE table in Snowflake.
+    tables = ['DIM_CUSTOMERS','DIM_PRODUCTS','DIM_STORE','DIM_USER',
               'DIM_LOCATION','CREDIT_POLICY','CUSTOMER_CREDIT_MAPPING']
     result = {}
     for t in tables:
@@ -872,7 +916,7 @@ def load_dimensions(full_load_dir: str = FULL_LOAD_DIR) -> Dict:
 # ============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description='Incremental Generator v2.2')
+    parser = argparse.ArgumentParser(description='Incremental Generator v2.3')
     parser.add_argument('--mode', choices=['full', 'daily', 'backfill'], default='daily')
     parser.add_argument('--date', default=None, help='Run date (YYYY-MM-DD)')
     parser.add_argument('--full-load-dir', default=FULL_LOAD_DIR)
@@ -889,11 +933,11 @@ def main():
         dims     = load_dimensions(args.full_load_dir)
         run_date = date.fromisoformat(args.date) if args.date else None
         kwargs   = dict(
-            customers      = dims.get('DIM_CUSTOMERS', []),
-            products       = dims.get('DIM_PRODUCTS', []),
-            stores         = dims.get('DIM_STORE', []),
-            employees      = dims.get('DIM_USER', []),
-            locations      = dims.get('DIM_LOCATION', []),
+            customers       = dims.get('DIM_CUSTOMERS', []),
+            products        = dims.get('DIM_PRODUCTS', []),
+            stores          = dims.get('DIM_STORE', []),
+            employees       = dims.get('DIM_USER', []),       # loaded from DIM_USER.csv
+            locations       = dims.get('DIM_LOCATION', []),
             credit_policies = dims.get('CREDIT_POLICY', []),
             credit_mappings = dims.get('CUSTOMER_CREDIT_MAPPING', []),
         )
