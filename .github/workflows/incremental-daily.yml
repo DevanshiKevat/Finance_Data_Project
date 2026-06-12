@@ -2,7 +2,7 @@ name: 3 - Daily Incremental
 
 on:
   schedule:
-    - cron: "0 6 * * *"   # 06:00 UTC every day
+    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       run_date:
@@ -22,12 +22,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: 'pip'                    # ← caches pip downloads
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      # State is read directly from Snowflake (PIPELINE_CHECKPOINT table)
-      # No artifact download needed
+        run: |
+          pip install --retries 5 \
+                      --timeout 120 \
+                      -r requirements.txt  # ← retries 5x with longer timeout
 
       - name: Run incremental_daily.py
         env:
@@ -55,5 +56,3 @@ jobs:
           SNOWFLAKE_DATABASE:     ${{ secrets.SNOWFLAKE_DATABASE }}
           OUTPUT_PATH:            ./data
         run: python Scripts/upload_to_snowflake.py --mode incremental
-
-      # State is saved back to Snowflake by incremental_daily.py automatically
