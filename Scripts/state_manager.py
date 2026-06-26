@@ -2,6 +2,10 @@
 State Manager - Saves/loads pipeline state to/from Snowflake
 Tables: PIPELINE_CHECKPOINT, OPEN_INVOICES_STATE (in RAW schema)
 Falls back to local JSON files if Snowflake tables don't exist yet.
+
+FIX: All column names are now double-quoted in SQL to match Terraform's
+     lowercase quoted identifiers. Without quotes, Snowflake uppercases
+     identifiers and fails with "invalid identifier 'CHECKPOINT_KEY'".
 """
 
 import json
@@ -29,20 +33,21 @@ def save_checkpoint(checkpoint_dict: dict):
         conn   = get_conn()
         cursor = conn.cursor()
         now    = datetime.utcnow()
+        # FIX: quote all column names to match Terraform lowercase identifiers
         cursor.execute("""
             MERGE INTO RAW.PIPELINE_CHECKPOINT AS target
             USING (
-                SELECT %s AS checkpoint_key,
-                       PARSE_JSON(%s) AS checkpoint_value,
-                       %s AS updated_at
+                SELECT %s AS "checkpoint_key",
+                       PARSE_JSON(%s) AS "checkpoint_value",
+                       %s AS "updated_at"
             ) AS source
-            ON target.checkpoint_key = source.checkpoint_key
+            ON target."checkpoint_key" = source."checkpoint_key"
             WHEN MATCHED THEN UPDATE SET
-                target.checkpoint_value = source.checkpoint_value,
-                target.updated_at       = source.updated_at
+                target."checkpoint_value" = source."checkpoint_value",
+                target."updated_at"       = source."updated_at"
             WHEN NOT MATCHED THEN INSERT
-                (checkpoint_key, checkpoint_value, updated_at)
-                VALUES (source.checkpoint_key, source.checkpoint_value, source.updated_at)
+                ("checkpoint_key", "checkpoint_value", "updated_at")
+                VALUES (source."checkpoint_key", source."checkpoint_value", source."updated_at")
         """, ('main', json.dumps(checkpoint_dict), now))
         cursor.close()
         conn.close()
@@ -56,10 +61,11 @@ def load_checkpoint() -> dict:
     """Load checkpoint from Snowflake. Raises FileNotFoundError if not found."""
     conn   = get_conn()
     cursor = conn.cursor()
+    # FIX: quote column names
     cursor.execute("""
-        SELECT checkpoint_value
+        SELECT "checkpoint_value"
         FROM RAW.PIPELINE_CHECKPOINT
-        WHERE checkpoint_key = 'main'
+        WHERE "checkpoint_key" = 'main'
     """)
     row = cursor.fetchone()
     cursor.close()
@@ -76,7 +82,7 @@ def save_open_invoices(invoices: list):
         cursor = conn.cursor()
         now    = datetime.utcnow()
 
-        cursor.execute("DELETE FROM RAW.OPEN_INVOICES_STATE")
+        cursor.execute('DELETE FROM RAW.OPEN_INVOICES_STATE')
 
         if invoices:
             values = []
@@ -97,12 +103,13 @@ def save_open_invoices(invoices: list):
                     inv.get('store_state'),
                     now,
                 ))
+            # FIX: quote column names to match Terraform lowercase identifiers
             cursor.executemany("""
                 INSERT INTO RAW.OPEN_INVOICES_STATE (
-                    invoice_key, invoice_id, customer_key, customer_type,
-                    invoice_date, due_date, original_amount, paid_so_far,
-                    remaining_balance, payment_habit, store_key, store_id,
-                    store_state, updated_at
+                    "invoice_key", "invoice_id", "customer_key", "customer_type",
+                    "invoice_date", "due_date", "original_amount", "paid_so_far",
+                    "remaining_balance", "payment_habit", "store_key", "store_id",
+                    "store_state", "updated_at"
                 ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, values)
 
@@ -118,10 +125,11 @@ def load_open_invoices() -> list:
     """Load open invoices from Snowflake."""
     conn   = get_conn()
     cursor = conn.cursor()
+    # FIX: quote column names
     cursor.execute("""
-        SELECT invoice_key, invoice_id, customer_key, customer_type,
-               invoice_date, due_date, original_amount, paid_so_far,
-               remaining_balance, payment_habit, store_key, store_id, store_state
+        SELECT "invoice_key", "invoice_id", "customer_key", "customer_type",
+               "invoice_date", "due_date", "original_amount", "paid_so_far",
+               "remaining_balance", "payment_habit", "store_key", "store_id", "store_state"
         FROM RAW.OPEN_INVOICES_STATE
     """)
     rows = cursor.fetchall()
