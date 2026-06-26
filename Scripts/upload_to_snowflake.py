@@ -2,6 +2,11 @@
 upload_to_snowflake.py
 Uploads generated CSVs to Snowflake internal stage and COPY INTO tables.
 Handles full load and incremental (inserts + MERGE for updates).
+
+FIXES:
+  1. ON_ERROR = 'ABORT_STATEMENT' instead of 'SKIP_FILE' — fails loudly.
+  2. MERGE column names are double-quoted to match Terraform lowercase identifiers.
+  3. Each upload is wrapped in try/except so failures are visible.
 """
 
 import os
@@ -73,8 +78,11 @@ def put_and_copy(cursor, local_path: str, stage_path: str, table_name: str):
             NULL_IF                      = ('', 'None', 'NULL')
             EMPTY_FIELD_AS_NULL          = TRUE
         )
-        ON_ERROR = 'SKIP_FILE'
+        ON_ERROR = 'ABORT_STATEMENT'
     """)
+    # FIX 1: was 'SKIP_FILE' — silently swallowed schema mismatches.
+    # 'ABORT_STATEMENT' raises an exception so the workflow fails visibly.
+
     for row in cursor.fetchall():
         print(f"    → {row}")
 
@@ -89,7 +97,12 @@ def run_full(conn):
         if not os.path.exists(path):
             print(f"  SKIP {table} (file not found)")
             continue
-        put_and_copy(cursor, os.path.abspath(path), f"full/{table}", table)
+        # FIX 3: wrap each upload so failures surface clearly
+        try:
+            put_and_copy(cursor, os.path.abspath(path), f"full/{table}", table)
+        except Exception as e:
+            print(f"  ❌ FAILED {table}: {e}")
+            raise
 
     cursor.close()
     print("✅ Full load upload complete.")
@@ -97,8 +110,8 @@ def run_full(conn):
 
 def run_incremental(conn):
     """Upload today's incremental files. Inserts go direct; updates use MERGE."""
-    base  = os.path.join(os.environ.get("OUTPUT_PATH", "./data"), "incremental")
-    today = date.today().strftime("%Y%m%d")
+    base    = os.path.join(os.environ.get("OUTPUT_PATH", "./data"), "incremental")
+    today   = date.today().strftime("%Y%m%d")
     inc_dir = os.path.join(base, today)
 
     if not os.path.exists(inc_dir):
@@ -114,8 +127,13 @@ def run_incremental(conn):
         if not os.path.exists(path):
             print(f"  SKIP {file_stem} (not generated today)")
             continue
-        put_and_copy(cursor, os.path.abspath(path),
-                     f"incremental/{today}/{file_stem}", target_table)
+        # FIX 3: wrap each upload so failures surface clearly
+        try:
+            put_and_copy(cursor, os.path.abspath(path),
+                         f"incremental/{today}/{file_stem}", target_table)
+        except Exception as e:
+            print(f"  ❌ FAILED {file_stem}: {e}")
+            raise
 
     # ── Updates via MERGE ─────────────────────────────────────
     updates_path = os.path.join(inc_dir, "FACT_INVOICE_HEADER_updates.csv")
@@ -152,16 +170,18 @@ def run_incremental(conn):
                 NULL_IF                      = ('', 'None', 'NULL')
                 EMPTY_FIELD_AS_NULL          = TRUE
             )
-            ON_ERROR = 'SKIP_FILE'
+            ON_ERROR = 'ABORT_STATEMENT'
         """)
 
+        # FIX 2: quote column names to match Terraform lowercase identifiers.
+        # Without quotes, Snowflake uppercases them → "invalid identifier" error.
         cursor.execute("""
             MERGE INTO RAW.FACT_INVOICE_HEADER AS target
             USING RAW.FACT_INVOICE_HEADER_UPDATES_TEMP AS source
-            ON target.invoice_key = source.invoice_key
+            ON target."invoice_key" = source."invoice_key"
             WHEN MATCHED THEN UPDATE SET
-                target.payment_status = source.payment_status,
-                target.net_payment    = source.net_payment
+                target."payment_status" = source."payment_status",
+                target."net_payment"    = source."net_payment"
         """)
         print("  ✅ FACT_INVOICE_HEADER updates merged.")
 
